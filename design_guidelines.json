@@ -1,0 +1,193 @@
+{
+  "app_name": "Hera",
+  "personality": "8 Hand-Drawn / Journal",
+  "personality_one_liner": "A warm, grounded, and emotionally safe space that feels like a trusted personal notebook rather than cold software.",
+  "color": {
+    "surface": "#FDFBF7",
+    "onSurface": "#2E2C29",
+    "surfaceSecondary": "#F4EFE6",
+    "onSurfaceSecondary": "#3A3835",
+    "surfaceTertiary": "#EBE3D5",
+    "onSurfaceTertiary": "#474440",
+    "surfaceInverse": "#2E2C29",
+    "onSurfaceInverse": "#FDFBF7",
+    "muted": "#7E7972",
+    "brand": "#748773",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#748773",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#96A695",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#DCE3DB",
+    "onBrandTertiary": "#2E3A2E",
+    "success": "#728965",
+    "onSuccess": "#FFFFFF",
+    "warning": "#D5A05B",
+    "onWarning": "#FFFFFF",
+    "error": "#B86B5D",
+    "onError": "#FFFFFF",
+    "info": "#848B89",
+    "onInfo": "#FFFFFF",
+    "border": "#E6DFD3",
+    "borderStrong": "#BDB6A8",
+    "divider": "#EFE9DF"
+  },
+  "typography": {
+    "displayFontFamily": "Fraunces",
+    "textFontFamily": "Nunito",
+    "scale": { "sm": 12, "base": 14, "lg": 16, "xl": 20, "2xl": 24 }
+  },
+  "spacing": {
+    "rule": "Generous, breathable paper-like margins. Avoid dense nesting. Soft, imperfect gaps rather than strict operational grids.",
+    "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "2xl": 32, "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "0",
+  "navigation": "bottom_tabs",
+  "icon_set": "Feather",
+  "glassmorphism": {
+    "enabled": "false",
+    "do's": [],
+    "dont's": ["Do not use blur or glassmorphism as it clashes with the matte, tactile paper aesthetic."]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Onboarding / Auth",
+      "purpose": "A calm, conversational entry asking the user about their manifestation goals.",
+      "states": {
+        "loading": "Centered soft pulsing brand circle",
+        "empty": "N/A",
+        "error": "Muted terracotta error text with a retry button"
+      },
+      "layout": "Full-bleed soft background images with a bottom sheet for form inputs. Sticky bottom CTA for 'Continue'. Inputs should have subtle bottom borders or soft rounded tertiary backgrounds rather than hard boxes."
+    },
+    {
+      "name": "Home (Today)",
+      "purpose": "Focus the user on a single daily affirmation, streak, and quick access to their core manifestation acts.",
+      "states": {
+        "loading": "Skeleton of the daily affirmation card with soft shimmer",
+        "empty": "A soft sketch-like illustration prompting them to set their first intention",
+        "error": "Retry loading today's intention"
+      },
+      "layout": "Header with user greeting and streak counter. Below, a large, beautiful Affirmation Card dominating the screen (using the morning sunlight image + scrim). Below that, a simple quick-action grid or list for Journal, Vision Board, and Visualization."
+    },
+    {
+      "name": "Journal & Vision Board",
+      "purpose": "A tactile, scrapbooking space for intentions and visual goals.",
+      "states": {
+        "loading": "Masonry/grid layout skeleton",
+        "empty": "Empty state illustration of an open notebook with 'Add your first vision' CTA",
+        "error": "Failed to load board, tap to retry"
+      },
+      "layout": "Top toggle (Segmented control) between 'Journal' and 'Vision Board'. Journal: simple list of dated cards. Vision Board: a relaxed 2-col masonry or asymmetrical grid of photos with small, handwritten-like captions. Generous spacing so it feels like pinned polaroids."
+    },
+    {
+      "name": "AI Manifestation Coach",
+      "purpose": "A safe, supportive chat interface with 'Hera'.",
+      "states": {
+        "loading": "Chat bubbles shimmering",
+        "empty": "Hera's avatar with introductory prompt chips",
+        "error": "Message failed to send"
+      },
+      "layout": "Conversational UI. User messages in brandTertiary, AI messages in surfaceSecondary. KeyboardAvoidingView with a soft input field. No sharp chat bubbles; use rounded lg radii. Include quick-reply chips above the input."
+    },
+    {
+      "name": "Discover",
+      "purpose": "Articles, quotes, and guided sessions laid out beautifully.",
+      "states": {
+        "loading": "Skeleton list of articles",
+        "empty": "No new content today",
+        "error": "Unable to fetch content"
+      },
+      "layout": "Horizontal scroll of category chips (brandTertiary). Below, large editorial cards for articles with background images, gradients, and white text over the scrim. Quiet humanist sans-serif for metadata."
+    },
+    {
+      "name": "Guided Visualization (Player)",
+      "purpose": "A serene, timed breathing/visualization session.",
+      "states": {
+        "loading": "Soft pulsing screen",
+        "empty": "N/A",
+        "error": "Session failed to load"
+      },
+      "layout": "Full-screen abstract aura background. Large central timer or breathing circle. Minimal controls (play/pause/end) at the bottom. No heavy chrome."
+    },
+    {
+      "name": "Profile & Premium Upsell",
+      "purpose": "Manage settings and subscribe to premium.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "Failed to load subscription details"
+      },
+      "layout": "Top section: Profile info and stats. A 'Pro' card with the gold texture background, featuring premium benefits in a list. Settings rows below with brandTertiary-tinted icon containers."
+    }
+  ],
+  "images": {
+    "affirmation_bg": {
+      "url": "https://images.unsplash.com/photo-1619331603973-492406a358b7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwxfHxjYWxtJTIwbW9ybmluZyUyMHN1bmxpZ2h0JTIwYWVzdGhldGljfGVufDB8fHx8MTc5MDg4MTk3OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "silhouette of plant during sunset"
+    },
+    "vision_travel": {
+      "url": "https://images.unsplash.com/photo-1609971757431-439cf7b4141b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwxfHxwYXJpcyUyMGVpZmZlbCUyMHRvd2VyJTIwYWVzdGhldGljfGVufDB8fHx8MTc5MDg4MTk3OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "eiffel tower in paris during daytime"
+    },
+    "vision_health": {
+      "url": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwxfHxoZWFsdGh5JTIwZm9vZCUyMGJvd2wlMjBhZXN0aGV0aWN8ZW58MHx8fHwxNzkwODgxOTc5fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "bowl of vegetable salads"
+    },
+    "vision_career": {
+      "url": "https://images.unsplash.com/photo-1549399905-5d1bad747576?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjB3b3Jrc3BhY2UlMjBtaW5pbWFsfGVufDB8fHx8MTc5MDg4MTk3OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "silver iMac beside MacBook Pro"
+    },
+    "guided_meditation": {
+      "url": "https://images.unsplash.com/photo-1635776062360-af423602aff3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NDh8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMHNvZnQlMjBncmFkaWVudCUyMGF1cmElMjBhZXN0aGV0aWN8ZW58MHx8fHwxNzkwODgxOTc5fDA&ixlib=rb-4.1.0&q=85",
+      "alt": "abstract blurred dark and light gradient"
+    },
+    "discover_1": {
+      "url": "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njl8MHwxfHNlYXJjaHwxfHxtZWRpdGF0aW9uJTIwbmF0dXJlJTIwYWVzdGhldGljfGVufDB8fHx8MTc5MDg4MTk3OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "woman sitting on bench over viewing mountain"
+    },
+    "discover_2": {
+      "url": "https://images.unsplash.com/photo-1586380951230-e6703d9f6833?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwxfHxqb3VybmFsaW5nJTIwY29mZmVlJTIwYWVzdGhldGljfGVufDB8fHx8MTc5MDg4MTk3OXww&ixlib=rb-4.1.0&q=85",
+      "alt": "white notebook on white textile"
+    },
+    "premium_bg": {
+      "url": "https://images.unsplash.com/photo-1733935156769-fe0c2a600d6c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTN8MHwxfHNlYXJjaHwxfHxwcmVtaXVtJTIwYWJzdHJhY3QlMjBnb2xkJTIwdGV4dHVyZSUyMGFlc3RoZXRpY3xlbnwwfHx8fDE3OTA4ODE5Nzl8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "A textured gold leaf surface with visible overlapping seams and a soft shadow"
+    }
+  },
+  "haptics": {
+    "events": {
+      "button_press": "light",
+      "tab_change": "light",
+      "goal_completed": "success",
+      "affirmation_swiped": "medium"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the Hand-Drawn / Journal personality constraints. No harsh shadows (tier 0), no glassmorphism (keep it matte and tactile), and irregular/mixed radii where applicable.",
+    "BANNED: Any shade of blue, purple, indigo, or highly saturated bright colors. Stick to the warm off-white and sage/moss earthy tones.",
+    "Use Fraunces (serif) for display/headings for an editorial, grounded feel and Nunito (sans-serif) for body text to maintain softness.",
+    "Whenever text is placed over imagery (e.g., Affirmation Card, Premium Upsell), use a top-to-bottom three-stop linear gradient scrim (transparent to ≥70% surfaceInverse) to ensure AAA readability.",
+    "For the vision board, use a flexible grid layout (e.g., 2-column with space-between) allowing generous 'md' or 'lg' gaps to feel like polaroids pinned to a board. Use real fetched images from the design_guidelines.",
+    "All primary CTAs (e.g., Save Journal Entry, Subscribe to Premium) should be sticky at the bottom above the safe area, allowing content to scroll fully behind it.",
+    "Avoid gamified clutter; streak markers or mood trackers should use subtle terracotta or sage dots. Keep the UI serene, centered on wellbeing, with generous whitespace."
+  ]
+}
