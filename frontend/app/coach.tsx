@@ -1,14 +1,15 @@
 import Feather from "@react-native-vector-icons/feather";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, streamCoach, type ChatMsg } from "@/src/api";
-import { Chip, IconButton, tap } from "@/src/components/ui";
-import { usesNativeTabs } from "@/src/navigation";
+import { Chip, IconButton, ScreenBg, tap } from "@/src/components/ui";
 import { fonts, makeStyles, radius, space, useTheme } from "@/src/theme";
 
 const PROMPTS = [
@@ -22,9 +23,11 @@ export default function Coach() {
   const styles = useStyles();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = 49 + insets.bottom;
-  const bottomChrome = usesNativeTabs ? insets.bottom : 0;
-  const kbOffset = usesNativeTabs ? insets.bottom : Platform.OS === "ios" ? tabBarHeight : 0;
+  const bottomChrome = insets.bottom;
+  const kbOffset = 0;
+  const router = useRouter();
+  const { q } = useLocalSearchParams<{ q?: string }>();
+  const sentQ = useRef(false);
   const qc = useQueryClient();
   const listRef = useRef<FlatList>(null);
   const [input, setInput] = useState("");
@@ -63,12 +66,20 @@ export default function Coach() {
     qc.invalidateQueries({ queryKey: ["coach"] });
   };
 
+  useEffect(() => {
+    if (q && !sentQ.current && history.isSuccess) {
+      sentQ.current = true;
+      send(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, history.isSuccess]);
+
   return (
     <View style={styles.root} testID="coach-screen">
+      <ScreenBg />
       <View style={[styles.header, { paddingTop: insets.top + space.md }]}>
-        <View style={styles.heraAvatar}>
-          <Feather name="feather" size={18} color={colors.onBrandPrimary} />
-        </View>
+        <IconButton testID="coach-back-button" name="arrow-left" onPress={() => router.back()} />
+        <Image source={require("../assets/images/hera-orb.png")} style={styles.heraAvatar} contentFit="contain" />
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Hera</Text>
           <Text style={styles.sub}>{streaming ? "writing to you…" : "Your manifestation coach"}</Text>
@@ -89,9 +100,7 @@ export default function Coach() {
             keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.empty} testID="coach-empty-state">
-                <View style={styles.emptyAvatar}>
-                  <Feather name="feather" size={30} color={colors.onBrandTertiary} />
-                </View>
+                <Image source={require("../assets/images/hera-orb.png")} style={styles.emptyAvatar} contentFit="contain" />
                 <Text style={styles.emptyTitle}>{"Hello, I'm Hera."}</Text>
                 <Text style={styles.emptyBody}>
                   {"Tell me what you're calling into your life. I'll help you shape it into words, feelings and gentle next steps."}
@@ -159,15 +168,15 @@ const useStyles = makeStyles((c) => ({
     paddingBottom: space.md,
     borderBottomWidth: 1,
     borderBottomColor: c.divider,
-    backgroundColor: c.surface,
+
   },
-  heraAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.brandPrimary, alignItems: "center", justifyContent: "center" },
-  title: { fontFamily: fonts.display, fontSize: 22, color: c.onSurface },
+  heraAvatar: { width: 40, height: 40 },
+  title: { fontFamily: fonts.display, fontWeight: "700", fontSize: 22, color: c.onSurface },
   sub: { fontFamily: fonts.text, fontSize: 13, color: c.muted },
   list: { padding: space.lg, gap: space.md, flexGrow: 1 },
   empty: { alignItems: "center", paddingTop: space.xxxl, paddingHorizontal: space.xl },
-  emptyAvatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: c.brandTertiary, alignItems: "center", justifyContent: "center" },
-  emptyTitle: { fontFamily: fonts.display, fontSize: 26, color: c.onSurface, marginTop: space.lg },
+  emptyAvatar: { width: 110, height: 110 },
+  emptyTitle: { fontFamily: fonts.display, fontWeight: "700", fontSize: 26, color: c.onSurface, marginTop: space.lg },
   emptyBody: { fontFamily: fonts.text, fontSize: 15, lineHeight: 23, color: c.muted, textAlign: "center", marginTop: space.sm },
   bubble: { maxWidth: "86%", paddingHorizontal: space.lg, paddingVertical: space.md, borderRadius: radius.lg },
   userBubble: { alignSelf: "flex-end", backgroundColor: c.brandTertiary, borderBottomRightRadius: radius.sm },
@@ -177,7 +186,7 @@ const useStyles = makeStyles((c) => ({
   err: { fontFamily: fonts.text, color: c.error, paddingHorizontal: space.xl, paddingBottom: space.sm },
   chipRow: { flexGrow: 0, height: 56 },
   chips: { paddingHorizontal: space.lg, gap: space.sm, alignItems: "center" },
-  inputBar: { flexDirection: "row", alignItems: "flex-end", gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.xs, backgroundColor: c.surface },
+  inputBar: { flexDirection: "row", alignItems: "flex-end", gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.xs },
   input: {
     flex: 1,
     minHeight: 48,

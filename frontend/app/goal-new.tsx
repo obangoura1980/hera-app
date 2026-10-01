@@ -149,7 +149,7 @@ export default function GoalNew() {
 const useStyles = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surface },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingBottom: space.sm },
-  headerTitle: { fontFamily: fonts.display, fontSize: 20, color: c.onSurface },
+  headerTitle: { fontFamily: fonts.display, fontWeight: "700", fontSize: 20, color: c.onSurface },
   scroll: { paddingHorizontal: space.xl, paddingBottom: space.xl },
   polaroid: {
     alignSelf: "center",
@@ -163,7 +163,7 @@ const useStyles = makeStyles((c) => ({
     marginTop: space.md,
   },
   preview: { aspectRatio: 0.85, backgroundColor: c.surfaceTertiary, borderRadius: 4, overflow: "hidden" },
-  title: { fontFamily: fonts.display, fontSize: 18, color: c.onSurface, paddingVertical: space.md, textAlign: "center" },
+  title: { fontFamily: fonts.display, fontWeight: "700", fontSize: 18, color: c.onSurface, paddingVertical: space.md, textAlign: "center" },
   label: { fontFamily: fonts.text, fontSize: 14, fontWeight: "800", color: c.muted, marginTop: space.xl, marginBottom: space.sm },
   hint: { fontFamily: fonts.text, fontSize: 14, color: c.muted, lineHeight: 20, marginBottom: space.md },
   chips: { gap: space.sm },

@@ -118,8 +118,8 @@ const useStyles = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surface },
   hero: { position: "absolute", top: 0, left: 0, right: 0, height: 340 },
   scroll: { paddingHorizontal: space.xl },
-  brand: { fontFamily: fonts.display, fontSize: 18, color: c.onSurfaceInverse, letterSpacing: 2 },
-  title: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: c.onSurface, marginTop: space.xxl },
+  brand: { fontFamily: fonts.display, fontWeight: "700", fontSize: 18, color: c.onSurfaceInverse, letterSpacing: 2 },
+  title: { fontFamily: fonts.display, fontWeight: "700", fontSize: 32, lineHeight: 38, color: c.onSurface, marginTop: space.xxl },
   card: {
     marginTop: space.xl,
     backgroundColor: c.surfaceSecondary,

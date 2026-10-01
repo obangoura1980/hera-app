@@ -9,18 +9,22 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { AuthProvider } from "@/src/auth";
 import { ErrorBoundary } from "@/src/components/error-boundary";
 import { queryClient } from "@/src/query-client";
-import { useTheme } from "@/src/theme";
+import { setThemeOverride, useTheme } from "@/src/theme";
+import { storage } from "@/src/utils/storage";
 
 // Disable logbox errors etc so that users can see the app
 // and agent works as expected.
 LogBox.ignoreAllLogs(true);
 
+// Re-apply the user's saved appearance choice (dark / light) on launch.
+storage.getItem<string | null>("hera_theme", null).then((v) => {
+  if (v === "dark" || v === "light") setThemeOverride(v);
+});
+
 export default function RootLayout() {
-  const { colors } = useTheme();
-  // Prewarm fonts, including the icon font so icons render on Expo Go Android.
+  const { colors, scheme } = useTheme();
+  // Prewarm the icon font so icons render on Expo Go Android.
   const [loaded, error] = useFonts({
-    Fraunces: require("../assets/fonts/Fraunces.ttf"),
-    Nunito: require("../assets/fonts/Nunito.ttf"),
     Feather: require("@react-native-vector-icons/feather/fonts/Feather.ttf"),
   });
 
@@ -40,7 +44,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <KeyboardProvider>
             <AuthProvider>
-              <StatusBar style="dark" />
+              <StatusBar style={scheme === "dark" ? "light" : "dark"} />
               <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
                 <Stack.Screen name="journal-new" options={{ presentation: "modal" }} />
                 <Stack.Screen name="goal-new" options={{ presentation: "modal" }} />

@@ -3,32 +3,28 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from "react-native";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
+import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { api, type Favorite, type Session, type Stats } from "@/src/api";
+import { api, fileSource, type Favorite, type Goal, type Session, type Stats } from "@/src/api";
 import { useAuth } from "@/src/auth";
-import { ErrorText, PressableScale, tap } from "@/src/components/ui";
-import { usesNativeTabs } from "@/src/navigation";
-import { fonts, makeStyles, radius, space, useTheme } from "@/src/theme";
+import { ErrorText, PressableScale, ScreenBg, tap } from "@/src/components/ui";
+import { useTabBottomSpace } from "@/src/navigation";
+import { makeStyles, radius, space, useTheme } from "@/src/theme";
 
-const AFF_BG = "https://images.unsplash.com/photo-1619331603973-492406a358b7?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200";
+const TRENDING = ["him obsessed with me", "$10k weeks", "Europe trip", "dream job", "glowing skin", "my soulmate"];
 
-function greeting() {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-}
-
-export default function Today() {
+export default function Home() {
   const styles = useStyles();
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const bottomChrome = usesNativeTabs ? insets.bottom : 0;
+  const bottomSpace = useTabBottomSpace();
   const router = useRouter();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const [desire, setDesire] = useState("");
   const [aiText, setAiText] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -37,10 +33,28 @@ export default function Today() {
   const today = useQuery({ queryKey: ["aff-today"], queryFn: () => api<{ text: string }>("/affirmations/today") });
   const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => api<Session[]>("/sessions") });
   const favs = useQuery({ queryKey: ["favorites"], queryFn: () => api<Favorite[]>("/affirmations/favorites") });
+  const goals = useQuery({ queryKey: ["goals"], queryFn: () => api<Goal[]>("/goals") });
+
+  const pulse = useSharedValue(1);
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(withTiming(1.06, { duration: 2400, easing: Easing.inOut(Easing.sin) }), withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) })),
+      -1,
+    );
+  }, [pulse]);
+  const orbStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
 
   const text = aiText ?? today.data?.text ?? "";
   const isFav = !!favs.data?.some((f) => f.text === text);
+  const name = (user?.name ?? "").split(" ")[0];
 
+  const askHera = (q: string) => {
+    const t = q.trim();
+    if (!t) return;
+    tap();
+    setDesire("");
+    router.push({ pathname: "/coach", params: { q: `I want to manifest: ${t}` } });
+  };
   const affirm = async () => {
     tap("success");
     await api("/affirmations/affirm", { method: "POST" });
@@ -56,8 +70,7 @@ export default function Today() {
     setErr(null);
     setAiBusy(true);
     try {
-      const r = await api<{ text: string }>("/affirmations/generate", { method: "POST", body: { intention: "" } });
-      setAiText(r.text);
+      setAiText((await api<{ text: string }>("/affirmations/generate", { method: "POST", body: { intention: "" } })).text);
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -65,103 +78,172 @@ export default function Today() {
     }
   };
 
-  const refresh = () => qc.invalidateQueries();
+  const pinned = goals.data ?? [];
 
   return (
     <View style={styles.root} testID="today-screen">
-      <View style={[styles.header, { paddingTop: insets.top + space.md }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.greet}>{greeting()},</Text>
-          <Text style={styles.name} testID="today-user-name" numberOfLines={1}>
-            {user?.name}
-          </Text>
-        </View>
-        <View style={styles.streak} testID="today-streak-badge">
-          <Feather name="sun" size={16} color={colors.warning} />
-          <Text style={styles.streakText}>{stats.data?.streak ?? 0} day streak</Text>
-        </View>
-        <PressableScale testID="today-profile-button" onPress={() => router.push("/profile")} style={styles.avatar}>
-          <Text style={styles.avatarText}>{(user?.name ?? "H").slice(0, 1).toUpperCase()}</Text>
-        </PressableScale>
-      </View>
-
+      <ScreenBg />
       <ScrollView
-        contentContainerStyle={{ paddingBottom: bottomChrome + space.xl }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} tintColor={colors.brandPrimary} />}
+        contentContainerStyle={{ paddingTop: insets.top + space.md, paddingBottom: bottomSpace }}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={() => qc.invalidateQueries()} tintColor={colors.brandPrimary} />}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.affCard} testID="today-affirmation-card">
-          <Image source={{ uri: AFF_BG }} style={styles.fill} contentFit="cover" transition={300} />
-          <LinearGradient colors={[colors.scrimClear, colors.scrim, colors.surfaceInverse]} locations={[0, 0.6, 1]} style={styles.fill} />
-          <View style={styles.affInner}>
-            <Text style={styles.affLabel}>{aiText ? "WRITTEN FOR YOU BY HERA" : "TODAY'S AFFIRMATION"}</Text>
+        <View style={styles.header}>
+          <Text style={styles.logo}>HERA</Text>
+          <View style={{ flexDirection: "row", gap: space.md }}>
+            <PressableScale testID="today-profile-button" onPress={() => router.push("/(tabs)/profile")} style={styles.headBtn}>
+              <Feather name="heart" size={20} color={colors.brandSecondary} />
+            </PressableScale>
+            <PressableScale testID="home-history-button" onPress={() => router.push("/(tabs)/journal")} style={styles.headBtn}>
+              <Feather name="clock" size={20} color={colors.brandSecondary} />
+            </PressableScale>
+          </View>
+        </View>
+
+        <Animated.View entering={FadeIn.duration(700)} style={styles.halo}>
+          <Animated.View style={orbStyle}>
+            <Image
+              testID="home-hera-orb"
+              source={scheme === "dark" ? require("../../assets/images/hera-orb.png") : require("../../assets/images/hera-orb-light.png")}
+              style={styles.orb}
+              contentFit="contain"
+            />
+          </Animated.View>
+        </Animated.View>
+
+        <Text style={styles.ask} testID="today-user-name">
+          {name ? `${name}, ` : ""}what do you{"\n"}want to <Text style={styles.askAccent}>manifest?</Text>
+        </Text>
+
+        <View style={styles.inputPill}>
+          <TextInput
+            testID="home-desire-input"
+            style={styles.input}
+            value={desire}
+            onChangeText={setDesire}
+            placeholder="him obsessed with me..."
+            placeholderTextColor={colors.muted}
+            onSubmitEditing={() => askHera(desire)}
+            returnKeyType="send"
+          />
+          <PressableScale testID="home-desire-send" onPress={() => askHera(desire)} style={styles.send}>
+            <Feather name="arrow-up" size={22} color={colors.onAction} />
+          </PressableScale>
+        </View>
+
+        <View style={styles.trendLabel}>
+          <Feather name="trending-up" size={14} color={colors.gold} />
+          <Text style={styles.trendText}>TRENDING MANIFESTATIONS</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendRow} keyboardShouldPersistTaps="handled">
+          {TRENDING.map((t, i) => (
+            <PressableScale key={t} testID={`home-trending-chip-${i}`} onPress={() => askHera(t)} style={styles.trendChip}>
+              <Text style={styles.trendChipText}>{t}</Text>
+            </PressableScale>
+          ))}
+        </ScrollView>
+
+        <View style={styles.forYouRow}>
+          <Text style={styles.forYou}>For you</Text>
+          <PressableScale testID="home-add-desire-button" onPress={() => router.push("/goal-new")} style={styles.editBtn}>
+            <Feather name="edit-2" size={15} color={colors.brandSecondary} />
+            <Text style={styles.editText}>Edit desires</Text>
+          </PressableScale>
+        </View>
+
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.cardWrap} testID="today-affirmation-card">
+          <LinearGradient colors={[colors.cardGradA, colors.cardGradB]} style={styles.card}>
+            <View style={styles.cardLabelRow}>
+              <Feather name="star" size={15} color={colors.warning} />
+              <Text style={styles.cardLabel}>{aiText ? "Written for you by Hera" : "Daily Affirmation"}</Text>
+              <View style={{ flex: 1 }} />
+              <View style={styles.streak} testID="today-streak-badge">
+                <Feather name="zap" size={13} color={colors.gold} />
+                <Text style={styles.streakText}>{stats.data?.streak ?? 0}-day streak</Text>
+              </View>
+            </View>
             {today.isLoading ? (
-              <ActivityIndicator color={colors.onSurfaceInverse} />
+              <ActivityIndicator color={colors.brandPrimary} />
             ) : (
               <Animated.Text key={text} entering={FadeIn.duration(500)} style={styles.affText} testID="today-affirmation-text">
                 {text}
               </Animated.Text>
             )}
             <View style={styles.affActions}>
-              <PressableScale
-                testID="today-affirm-button"
-                onPress={affirm}
-                haptic={null}
-                style={[styles.affirmBtn, stats.data?.affirmed_today ? styles.affirmBtnDone : {}]}
-              >
-                <Feather name={stats.data?.affirmed_today ? "check" : "heart"} size={16} color={colors.onBrandTertiary} />
+              <PressableScale testID="today-affirm-button" onPress={affirm} haptic={null} style={styles.affirmBtn}>
+                <LinearGradient colors={[colors.gradStart, colors.gradEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fill} />
+                <Feather name={stats.data?.affirmed_today ? "check" : "heart"} size={16} color={colors.onBrandPrimary} />
                 <Text style={styles.affirmText}>{stats.data?.affirmed_today ? "Affirmed today" : "I affirm this"}</Text>
               </PressableScale>
               <PressableScale testID="today-favorite-button" onPress={toggleFav} style={styles.roundBtn}>
-                <Feather name="bookmark" size={18} color={isFav ? colors.warning : colors.onSurfaceInverse} />
+                <Feather name="bookmark" size={18} color={isFav ? colors.gold : colors.brandSecondary} />
               </PressableScale>
               <PressableScale testID="today-generate-button" onPress={generate} disabled={aiBusy} style={styles.roundBtn}>
-                {aiBusy ? (
-                  <ActivityIndicator size="small" color={colors.onSurfaceInverse} />
-                ) : (
-                  <Feather name="feather" size={18} color={colors.onSurfaceInverse} />
-                )}
+                {aiBusy ? <ActivityIndicator size="small" color={colors.brandSecondary} /> : <Feather name="refresh-cw" size={18} color={colors.brandSecondary} />}
               </PressableScale>
             </View>
-          </View>
+            <ErrorText msg={err} testID="today-error-text" />
+          </LinearGradient>
         </Animated.View>
-        <View style={{ paddingHorizontal: space.xl }}>
-          <ErrorText msg={err} testID="today-error-text" />
-        </View>
 
-        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.statsRow}>
+        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.cardWrap}>
+          <PressableScale testID="home-vision-card" onPress={() => router.push("/vision")}>
+            <LinearGradient colors={[colors.visionGradA, colors.visionGradB]} style={styles.card}>
+              <View style={styles.cardLabelRow}>
+                <Feather name="image" size={15} color={colors.gold} />
+                <Text style={styles.cardLabel}>Vision Board</Text>
+              </View>
+              <Text style={styles.visionTitle}>
+                {pinned.length
+                  ? `"${pinned[0].title}" — ${Math.round(((stats.data?.goals_achieved ?? 0) / pinned.length) * 100)}% manifested`
+                  : "Pin your first dream"}
+              </Text>
+              <View style={styles.thumbs}>
+                {pinned.slice(0, 3).map((g) => (
+                  <View key={g.id} style={styles.thumb}>
+                    {g.image_path || g.image_url ? (
+                      <Image source={g.image_path ? fileSource(g.image_path) : { uri: g.image_url! }} style={styles.fill} contentFit="cover" />
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+              <View style={styles.explore}>
+                <Text style={styles.exploreText}>View Board</Text>
+                <Feather name="arrow-right" size={15} color={colors.brandSecondary} />
+              </View>
+            </LinearGradient>
+          </PressableScale>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.cardWrap}>
+          <PressableScale testID="home-chat-card" onPress={() => router.push("/coach")}>
+            <LinearGradient colors={[colors.cardGradA, colors.cardGradB]} style={styles.card}>
+              <View style={styles.cardLabelRow}>
+                <Feather name="message-circle" size={15} color={colors.brandSecondary} />
+                <Text style={styles.cardLabel}>Chat with Hera</Text>
+              </View>
+              <Text style={styles.visionTitle}>Your AI coach is ready. Share what you want to manifest today.</Text>
+              <View style={styles.explore}>
+                <Text style={styles.exploreText}>Start Chat</Text>
+                <Feather name="arrow-right" size={15} color={colors.brandSecondary} />
+              </View>
+            </LinearGradient>
+          </PressableScale>
+        </Animated.View>
+
+        <View style={styles.statsRow}>
           {[
-            { k: "journal_count", label: "Entries", icon: "edit-3" },
-            { k: "goals_achieved", label: "Manifested", icon: "star" },
-            { k: "sessions_done", label: "Sessions", icon: "wind" },
+            { k: "journal_count", label: "Entries" },
+            { k: "goals_achieved", label: "Manifested" },
+            { k: "sessions_done", label: "Sessions" },
           ].map((s) => (
             <View key={s.k} style={styles.stat} testID={`today-stat-${s.k}`}>
-              <Feather name={s.icon as any} size={16} color={colors.brandPrimary} />
               <Text style={styles.statNum}>{(stats.data as any)?.[s.k] ?? 0}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
             </View>
           ))}
-        </Animated.View>
-
-        <Text style={styles.section}>Your practice</Text>
-        <Animated.View entering={FadeInDown.duration(500).delay(180)} style={styles.actions}>
-          {[
-            { id: "journal", icon: "edit-3", title: "Write in your journal", body: "Gratitude, intentions, reflections", go: "/journal-new" },
-            { id: "vision", icon: "image", title: "Pin a vision", body: "Add a dream to your board", go: "/goal-new" },
-            { id: "coach", icon: "message-circle", title: "Talk with Hera", body: "Your AI manifestation coach", go: "/(tabs)/coach" },
-          ].map((a) => (
-            <PressableScale key={a.id} testID={`today-action-${a.id}`} onPress={() => router.push(a.go as any)} style={styles.actionRow}>
-              <View style={styles.actionIcon}>
-                <Feather name={a.icon as any} size={20} color={colors.onBrandTertiary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.actionTitle}>{a.title}</Text>
-                <Text style={styles.actionBody}>{a.body}</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={colors.muted} />
-            </PressableScale>
-          ))}
-        </Animated.View>
+        </View>
 
         <Text style={styles.section}>Guided visualizations</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sessionRow}>
@@ -191,105 +273,61 @@ export default function Today() {
 const useStyles = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surface },
   fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  header: {
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.xl },
+  logo: { fontSize: 26, fontWeight: "900", letterSpacing: 6, color: c.onSurface },
+  headBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceSecondary, borderWidth: 1, borderColor: c.border },
+  halo: { alignSelf: "center", width: 220, height: 220, borderRadius: 110, backgroundColor: c.orbHalo, alignItems: "center", justifyContent: "center", marginTop: space.xl },
+  orb: { width: 120, height: 120 },
+  ask: { fontSize: 30, lineHeight: 40, fontWeight: "800", color: c.onSurface, textAlign: "center", marginTop: space.xl, paddingHorizontal: space.xl },
+  askAccent: { fontStyle: "italic", color: c.accentText },
+  inputPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: space.xl,
-    paddingBottom: space.md,
-    gap: space.sm,
-    backgroundColor: c.surface,
-  },
-  greet: { fontFamily: fonts.text, fontSize: 15, color: c.muted },
-  name: { fontFamily: fonts.display, fontSize: 28, color: c.onSurface },
-  streak: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: space.md,
-    height: 36,
-    borderRadius: radius.pill,
+    marginHorizontal: space.xl,
+    marginTop: space.xl,
+    height: 64,
+    borderRadius: 32,
+    paddingLeft: space.xl,
+    paddingRight: 6,
     backgroundColor: c.surfaceSecondary,
     borderWidth: 1,
     borderColor: c.border,
   },
-  streakText: { fontFamily: fonts.text, fontSize: 13, fontWeight: "700", color: c.onSurfaceSecondary },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: c.brandTertiary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { fontFamily: fonts.display, fontSize: 18, color: c.onBrandTertiary },
-  affCard: {
-    marginHorizontal: space.xl,
-    marginTop: space.sm,
-    height: 400,
-    borderRadius: 28,
-    borderTopLeftRadius: radius.lg,
-    overflow: "hidden",
-    backgroundColor: c.surfaceInverse,
-  },
-  affInner: { flex: 1, justifyContent: "flex-end", padding: space.xl },
-  affLabel: { fontFamily: fonts.text, fontSize: 12, fontWeight: "800", letterSpacing: 1.5, color: c.brandTertiary, marginBottom: space.md },
-  affText: { fontFamily: fonts.display, fontSize: 26, lineHeight: 34, color: c.onSurfaceInverse },
+  input: { flex: 1, fontSize: 16, color: c.onSurface, height: 60 },
+  send: { width: 52, height: 52, borderRadius: 26, backgroundColor: c.action, borderWidth: 1.5, borderColor: c.brandPrimary, alignItems: "center", justifyContent: "center" },
+  trendLabel: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, marginTop: space.xl },
+  trendText: { fontSize: 12, fontWeight: "700", letterSpacing: 2.5, color: c.muted },
+  trendRow: { paddingHorizontal: space.xl, gap: space.sm, paddingTop: space.md, height: 56 },
+  trendChip: { height: 44, paddingHorizontal: space.xl, borderRadius: radius.pill, backgroundColor: c.surfaceSecondary, borderWidth: 1, borderColor: c.border, justifyContent: "center", flexShrink: 0 },
+  trendChipText: { fontSize: 15, color: c.onSurfaceTertiary, fontWeight: "500" },
+  forYouRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.xl, marginTop: space.xxl, marginBottom: space.lg },
+  forYou: { fontSize: 30, fontWeight: "800", color: c.onSurface },
+  editBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceSecondary },
+  editText: { fontSize: 14, fontWeight: "600", color: c.brandSecondary },
+  cardWrap: { marginHorizontal: space.xl, marginBottom: space.lg, borderRadius: 24, overflow: "hidden", borderWidth: 1, borderColor: c.border },
+  card: { padding: space.xl },
+  cardLabelRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginBottom: space.md },
+  cardLabel: { fontSize: 13, fontWeight: "700", letterSpacing: 0.5, color: c.brandSecondary },
+  streak: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: space.sm, height: 26, borderRadius: radius.pill, backgroundColor: c.brandTertiary },
+  streakText: { fontSize: 12, fontWeight: "700", color: c.gold },
+  affText: { fontSize: 21, lineHeight: 30, fontWeight: "600", color: c.onSurface },
   affActions: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.xl },
-  affirmBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: radius.pill,
-    backgroundColor: c.brandTertiary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: space.sm,
-  },
-  affirmBtnDone: { opacity: 0.85 },
-  affirmText: { fontFamily: fonts.text, fontSize: 15, fontWeight: "700", color: c.onBrandTertiary },
-  roundBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "rgba(253,251,247,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  statsRow: { flexDirection: "row", gap: space.md, paddingHorizontal: space.xl, marginTop: space.xl },
-  stat: {
-    flex: 1,
-    backgroundColor: c.surfaceSecondary,
-    borderRadius: radius.md,
-    padding: space.md,
-    gap: 2,
-    borderWidth: 1,
-    borderColor: c.border,
-  },
-  statNum: { fontFamily: fonts.display, fontSize: 24, color: c.onSurface, marginTop: space.xs },
-  statLabel: { fontFamily: fonts.text, fontSize: 12, color: c.muted },
-  section: { fontFamily: fonts.display, fontSize: 22, color: c.onSurface, paddingHorizontal: space.xl, marginTop: space.xxl, marginBottom: space.md },
-  actions: {
-    marginHorizontal: space.xl,
-    backgroundColor: c.surfaceSecondary,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: c.border,
-  },
-  actionRow: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, minHeight: 64 },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: c.brandTertiary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionTitle: { fontFamily: fonts.text, fontSize: 16, fontWeight: "700", color: c.onSurface },
-  actionBody: { fontFamily: fonts.text, fontSize: 13, color: c.muted, marginTop: 2 },
+  affirmBtn: { flex: 1, height: 48, borderRadius: radius.pill, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm },
+  affirmText: { fontSize: 15, fontWeight: "700", color: c.onBrandPrimary },
+  roundBtn: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceSecondary },
+  visionTitle: { fontSize: 19, fontWeight: "700", color: c.onSurface },
+  thumbs: { flexDirection: "row", gap: space.sm, marginTop: space.lg },
+  thumb: { width: 64, height: 80, borderRadius: radius.md, overflow: "hidden", backgroundColor: c.surfaceTertiary },
+  explore: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: space.lg },
+  exploreText: { fontSize: 14, fontWeight: "600", color: c.brandSecondary },
+  statsRow: { flexDirection: "row", gap: space.md, paddingHorizontal: space.xl, marginTop: space.sm },
+  stat: { flex: 1, backgroundColor: c.surfaceSecondary, borderRadius: 18, padding: space.md, alignItems: "center", borderWidth: 1, borderColor: c.border },
+  statNum: { fontSize: 24, fontWeight: "800", color: c.onSurface },
+  statLabel: { fontSize: 12, color: c.muted, marginTop: 2 },
+  section: { fontSize: 22, fontWeight: "800", color: c.onSurface, paddingHorizontal: space.xl, marginTop: space.xxl, marginBottom: space.md },
   sessionRow: { paddingHorizontal: space.xl, gap: space.md },
   sessionCard: { width: 200, height: 240, borderRadius: radius.lg, overflow: "hidden", backgroundColor: c.surfaceTertiary },
   sessionInner: { flex: 1, justifyContent: "flex-end", padding: space.lg },
-  sessionMeta: { fontFamily: fonts.text, fontSize: 11, fontWeight: "800", letterSpacing: 1, color: c.brandTertiary },
-  sessionTitle: { fontFamily: fonts.display, fontSize: 20, color: c.onSurfaceInverse, marginTop: space.xs },
+  sessionMeta: { fontSize: 11, fontWeight: "800", letterSpacing: 1, color: c.onSurfaceInverse, opacity: 0.8 },
+  sessionTitle: { fontSize: 20, fontWeight: "700", color: c.onSurfaceInverse, marginTop: space.xs },
 }));

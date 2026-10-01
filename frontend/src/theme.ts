@@ -30,7 +30,7 @@
 // Nothing else changes; the device setting takes over automatically.
 // Feel free to add as many new colors as you need to support the design guidelines.
 
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { Appearance, StyleSheet, useColorScheme } from "react-native";
 
 export type ColorScheme = "light" | "dark";
@@ -40,18 +40,34 @@ const light = {
   // Surfaces: backgrounds, from the screen down to small fills.
   // Each `on` key is the text and icon color for that background.
   // ---------------------------------------------------------------------------
-  surface: "#FDFBF7", // primary canvas, most of every screen
-  onSurface: "#2E2C29", // text and icons on the canvas
-  surfaceSecondary: "#F4EFE6", // cards, sheets, list rows
-  onSurfaceSecondary: "#3A3835", // text and icons on cards, sheets, rows
-  surfaceTertiary: "#EBE3D5", // input backgrounds, chips, deepest nesting
-  onSurfaceTertiary: "#474440", // text on inputs and chips; also muted text
-  surfaceInverse: "#2E2C29", // tooltips, snackbars, anything popping against the theme
-  onSurfaceInverse: "#FDFBF7", // text and icons on the inverse surface
-  muted: "#7E7972", // subdued text on surface: captions, timestamps, placeholders
-  scrim: "rgba(46,44,41,0.78)", // image scrim end stop
-  scrimClear: "rgba(46,44,41,0)", // image scrim start stop
-  gold: "#D5A05B", // premium accent
+  // Light = "Blush Rose" from the original Hera brand
+  surface: "#FDE8EA", // primary canvas, most of every screen
+  onSurface: "#1A0A14", // text and icons on the canvas
+  surfaceSecondary: "#FFFFFF", // cards, sheets, list rows
+  onSurfaceSecondary: "#1A0A14", // text and icons on cards, sheets, rows
+  surfaceTertiary: "#FEF0F2", // input backgrounds, chips, deepest nesting
+  onSurfaceTertiary: "#6B4050", // text on inputs and chips; also muted text
+  surfaceInverse: "#1A0A14", // dark fill behind imagery
+  onSurfaceInverse: "#FFFFFF", // text and icons over imagery / inverse
+  muted: "#8C6A76", // subdued text on surface: captions, timestamps, placeholders
+  scrim: "rgba(10,10,20,0.85)", // image scrim end stop
+  scrimClear: "rgba(10,10,20,0)", // image scrim start stop
+  gold: "#C4707A", // accent
+  bgTop: "#FDE8EA", // screen background gradient
+  bgBottom: "#F5C2C7",
+  gradStart: "#A855F7", // signature CTA gradient
+  gradEnd: "#EC4899",
+  action: "#2D1520", // dark round action buttons (send)
+  onAction: "#FFFFFF",
+  orbHalo: "#F3CDBE", // circle behind Hera orb
+  accentText: "#C4707A", // highlighted words ("manifest?")
+  cardGradA: "#FFFFFF",
+  cardGradB: "#FEF0F2",
+  visionGradA: "#FFFFFF",
+  visionGradB: "#FCE1E5",
+  tabBar: "rgba(255,255,255,0.85)",
+  tabActive: "#2D1520",
+  tabInactive: "#B0909A",
   // Hera aura splash (original brand landing)
   auraDeep: "#020408",
   auraMid: "#060B1E",
@@ -69,46 +85,87 @@ const light = {
   // Brand: the identity color and the fills built from it.
   // Neutral by default; replace with the design guidelines values.
   // ---------------------------------------------------------------------------
-  brand: "#748773", // base hue, anchor only; Primary, Secondary, Tertiary are weights of it
+  brand: "#C4707A", // dusty rose
   onBrand: "#FFFFFF", // text and icons placed directly on brand
-  brandPrimary: "#5F725E", // primary CTA, active tab indicator, selected states
+  brandPrimary: "#C4707A", // primary CTA, active tab indicator, selected states
   onBrandPrimary: "#FFFFFF", // text and icons on brandPrimary
-  brandSecondary: "#96A695", // secondary CTA, less prominent accents
+  brandSecondary: "#D4939A", // secondary CTA, less prominent accents
   onBrandSecondary: "#FFFFFF", // text and icons on brandSecondary
-  brandTertiary: "#DCE3DB", // chips, tags, badges, subtle brand moments
-  onBrandTertiary: "#2E3A2E", // text and icons on brandTertiary
+  brandTertiary: "#F9D5D9", // chips, tags, badges, subtle brand moments
+  onBrandTertiary: "#A85560", // text and icons on brandTertiary
 
   // ---------------------------------------------------------------------------
   // Status: semantic only, never decorative. Fill for badges, banners and
   // toasts; the `on` key is text on that fill. The plain key is also safe as
   // text on `surface`.
   // ---------------------------------------------------------------------------
-  success: "#728965",
+  success: "#10B981",
   onSuccess: "#FFFFFF",
-  warning: "#D5A05B",
+  warning: "#F59E0B",
   onWarning: "#FFFFFF",
-  error: "#B86B5D",
+  error: "#EF4444",
   onError: "#FFFFFF",
-  info: "#848B89",
+  info: "#6B4050",
   onInfo: "#FFFFFF",
 
   // ---------------------------------------------------------------------------
   // Lines
   // ---------------------------------------------------------------------------
-  border: "#E6DFD3", // hairline outline, 0.5pt or 1pt max: inputs, cards
-  borderStrong: "#BDB6A8", // focus rings, selected outlines, 1.5pt max
-  divider: "#EFE9DF", // subtle list separators
+  border: "rgba(0,0,0,0.08)", // hairline outline, 0.5pt or 1pt max: inputs, cards
+  borderStrong: "rgba(196,112,122,0.45)", // focus rings, selected outlines, 1.5pt max
+  divider: "rgba(0,0,0,0.06)", // subtle list separators
 };
 
-export const fonts = { display: "Fraunces", text: "Nunito" };
+// Dark = "Ethereal Aura" from the original Hera brand
+const dark: typeof light = {
+  ...light,
+  surface: "#080A18",
+  onSurface: "#FFFFFF",
+  surfaceSecondary: "#141530",
+  onSurfaceSecondary: "#FFFFFF",
+  surfaceTertiary: "#1B1C3D",
+  onSurfaceTertiary: "#C084FC",
+  surfaceInverse: "#04050D",
+  onSurfaceInverse: "#FFFFFF",
+  muted: "rgba(192,132,252,0.6)",
+  gold: "#F472B6",
+  bgTop: "#080A18",
+  bgBottom: "#131838",
+  action: "#1E0A3C",
+  onAction: "#FFFFFF",
+  orbHalo: "#2B1356",
+  accentText: "#C084FC",
+  cardGradA: "rgba(124,58,237,0.45)",
+  cardGradB: "rgba(20,21,48,0.95)",
+  visionGradA: "rgba(236,72,153,0.32)",
+  visionGradB: "rgba(20,21,48,0.95)",
+  tabBar: "rgba(30,27,46,0.92)",
+  tabActive: "#C084FC",
+  tabInactive: "rgba(192,132,252,0.42)",
+  brand: "#A855F7",
+  brandPrimary: "#A855F7",
+  brandSecondary: "#C084FC",
+  brandTertiary: "rgba(168,85,247,0.18)",
+  onBrandTertiary: "#C084FC",
+  success: "#34D399",
+  warning: "#FBBF24",
+  error: "#F87171",
+  info: "#C084FC",
+  border: "rgba(168,85,247,0.25)",
+  borderStrong: "rgba(168,85,247,0.6)",
+  divider: "rgba(168,85,247,0.15)",
+};
+
+// Original Hera uses the platform system font
+export const fonts: { display: string | undefined; text: string | undefined } = { display: undefined, text: undefined };
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 };
-export const radius = { sm: 6, md: 12, lg: 20, pill: 999 };
+export const radius = { sm: 8, md: 12, lg: 20, pill: 999 };
 
 export type ThemeColors = typeof light;
 
-export const defaultScheme = "light" satisfies ColorScheme;
+export const defaultScheme = "dark" satisfies ColorScheme;
 
-export const themes: { light: ThemeColors; dark?: ThemeColors } = { light };
+export const themes: { light: ThemeColors; dark?: ThemeColors } = { light, dark };
 
 // In-app theme toggle, only after `dark` exists in `themes`. Call
 // setColorScheme("dark"), setColorScheme("light"), or setColorScheme(null) to
@@ -125,9 +182,27 @@ export function setColorScheme(scheme: ColorScheme | null) {
 // Optional call because react-native-web does not implement it.
 setColorScheme?.(themes.dark ? null : defaultScheme);
 
+// In-app override so the toggle also works where Appearance.setColorScheme
+// is a no-op (react-native-web).
+let override: ColorScheme | null = null;
+const listeners = new Set<() => void>();
+export function setThemeOverride(scheme: ColorScheme | null) {
+  override = scheme;
+  setColorScheme(scheme);
+  listeners.forEach((l) => l());
+}
+function subscribe(l: () => void) {
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+}
+
 export function useTheme(): { scheme: ColorScheme; colors: ThemeColors } {
   const system = useColorScheme();
-  const scheme: ColorScheme = system && themes[system] ? system : defaultScheme;
+  const forced = useSyncExternalStore(subscribe, () => override, () => override);
+  const pick = forced ?? system;
+  const scheme: ColorScheme = pick && themes[pick] ? pick : defaultScheme;
   return { scheme, colors: themes[scheme] ?? themes.light };
 }
 

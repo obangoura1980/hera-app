@@ -26,3 +26,11 @@
 - P1: Daily reminder notifications; edit journal entries; AI journal prompts
 - P1: Audio narration for visualizations (TTS)
 - P2: Share affirmation cards as images; refresh tokens; Supabase data import from old app
+
+## Update (2026-10-01) — Original brand restored
+- BRAND_GUIDE.md created (original repo vs rebuild); original assets copied to /app/brand-assets/original
+- Landing splash (logo, glowing HERA, aura rings, "tap anywhere to begin")
+- Theme: dark "Ethereal Aura" + light "Blush Rose" with in-app toggle (persisted, works on web too); system font
+- Floating capsule tab bar: Home, Discover, Journal, Profile; coach moved to /coach, vision board to /vision
+- Home redesigned (orb, "what do you want to manifest?" → coach, trending chips, For you cards); Journal (stats, filters, emoji moods); Discover (featured hero + row cards); Settings (stats, achievements, appearance switch, account); Premium paywall ($6.99/mo annual, $9.99/mo monthly — still MOCKED)
+- App icon / splash / adaptive icon / favicon set to Hera logo

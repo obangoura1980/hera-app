@@ -110,10 +110,10 @@ export default function JournalNew() {
 const useStyles = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surface },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.lg, paddingBottom: space.sm },
-  headerTitle: { fontFamily: fonts.display, fontSize: 20, color: c.onSurface },
+  headerTitle: { fontFamily: fonts.display, fontWeight: "700", fontSize: 20, color: c.onSurface },
   scroll: { paddingHorizontal: space.xl, paddingBottom: space.xl },
   chips: { gap: space.sm, paddingVertical: space.md },
-  title: { fontFamily: fonts.display, fontSize: 26, color: c.onSurface, paddingVertical: space.md, borderBottomWidth: 1, borderBottomColor: c.divider },
+  title: { fontFamily: fonts.display, fontWeight: "700", fontSize: 26, color: c.onSurface, paddingVertical: space.md, borderBottomWidth: 1, borderBottomColor: c.divider },
   content: {
     fontFamily: fonts.text,
     fontSize: 17,

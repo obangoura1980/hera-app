@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend-only visual/brand redesign + navigation restructure verified at 390x844. All critical flows pass: Landing (hera-logo + typewriter 'HERA' on dark aura gradient with pulsing rings) -> onboarding (3 slides via onboarding-next-button) -> auth -> login as maya@hera.app. Floating capsule tab bar renders Home/Discover/Journal/Profile icons only (no Coach tab) with testIDs tab-home / tab-discover / tab-journal / tab-profile and switches screens. Home: HERA header, home-hera-orb (gold orb inside halo), 'Maya, what do you want to manifest?' with pink accentText 'manifest?', home-desire-input + home-desire-send -> /coach?q=... with streamed personalized GPT reply (coach-message-* rendered, 'Absolutely, Maya...'), coach-back-button returns home. home-trending-chip-0 also opens coach with 'him obsessed with me'. today-affirm-button marks 'Affirmed today', today-favorite-button and today-generate-button present. home-vision-card -> /vision shows Vision Board, vision-add-goal-fab -> /goal-new (Pin a vision form with Travel/Health/Career/Love categories + image picker), goal-save-button saves and returns, 'Paris trip' pin appears, vision-back-button returns. home-chat-card and home-add-desire-button present. Journal tab: journal-stats-card (2 Entries / Avg Mood / 1 Gratitude / 0 Wins), filters journal-filter-all/gratitude/intention/reflection, entries list with delete icons, journal-add-entry-fab -> /journal-new. Discover tab: 6 discover-chip-* (All/Mindset/Abundance/Love/Health/...), featured hero card first, quote card, row cards for others; 6 discover-article-*. Profile tab: Settings/Journey layout with stats grid, achievements, profile-theme-toggle flips theme instantly across all tabs (Blush Rose light = pink #FDE8EA background with white cards and dusty-rose #C4707A accents verified on Home/Discover/Journal; Ethereal Aura dark = navy #080A18 with violet #A855F7 / pink #EC4899 accents). profile-premium-row -> /premium with premium-plan-annual / premium-plan-monthly toggles that correctly update premium-subscribe-button CTA ('Start My 7-Day Free Trial – $9.99/mo' vs '$6.99/mo'); subscribe is MOCKED. profile-logout-button -> /auth. No invisible/unreadable text found in either theme; no red-screen errors; only a non-blocking web-only deprecation warning for 'textShadow*'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Home (tabs/index)", "issues": ["At the very bottom of the scroll, the 'Vision Board' card label is partially occluded by the floating capsule tab bar. The ScrollView contentContainerStyle should reserve extra bottom padding (tabBarBottom + TAB_BAR_HEIGHT + ~16) so last card title is fully visible above the capsule."]}
+    ],
+    "react_native_issues": [
+      {"component": "Landing title textShadow", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Reference: /app/frontend/app/index.tsx:127-129 (title uses textShadowColor/Offset/Radius). Migrate to the new unified textShadow property per RN 0.86."}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_hera_backend.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Add bottom padding to Home ScrollView (and verify Journal/Discover) equal to tabBarBottom(insets.bottom) + TAB_BAR_HEIGHT + 16 so last card is not hidden by the floating capsule.",
+    "Migrate deprecated textShadowColor/textShadowOffset/textShadowRadius on Landing title (/app/frontend/app/index.tsx) to the unified textShadow style prop."
+  ],
+  "critical_code_review_comments": [
+    "theme.ts cleanly introduces dark 'Ethereal Aura' and light 'Blush Rose' palettes with on* pairs; setThemeOverride + useSyncExternalStore pattern correctly re-renders all consumers including react-native-web where Appearance.setColorScheme is a no-op.",
+    "(tabs)/_layout.tsx: FloatingTabBar correctly maps 'index' route to tab-home testID and other routes (discover/journal/profile) use their own names; icon-only design matches brand; capsule uses c.tabBar with hairline border.",
+    "Coach is correctly moved out of tabs into a stack screen at /coach and launched from Home with ?q= autosend; back navigation works. No tab chrome bleeds into /coach."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not retested)", "frontend": "100% of requested flows (minor design nit on bottom padding)"},
+  "seed_data_creation": "Added one vision goal 'Paris trip' (category Travel) for maya@hera.app during the vision flow test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Hera brand redesign verified. Floating capsule bar is drawn via Tabs tabBar prop; coach is a stack screen at /coach, vision at /vision, goal-new at /goal-new, premium at /premium, journal-new at /journal-new. Theme override is in-app only (listeners set) so toggling on Profile instantly updates all open tab screens. Premium activate is MOCKED (user already is_premium=true from previous iteration). Known web-only warning: 'textShadow*' deprecation on Landing title.",
+  "rca_of_issue": "n/a (no bugs). Minor UX: scroll padding on Home allows the last card label to sit under the floating tab bar at the end of the scroll. Fix: increase paddingBottom on the inner ScrollView contentContainerStyle to tabBarBottom(insets.bottom)+TAB_BAR_HEIGHT+16."
+}

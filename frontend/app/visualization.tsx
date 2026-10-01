@@ -137,7 +137,7 @@ const useStyles = makeStyles((c) => ({
   content: { flex: 1, paddingHorizontal: space.xl },
   top: { flexDirection: "row", alignItems: "center", gap: space.md },
   close: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.25)" },
-  title: { fontFamily: fonts.display, fontSize: 22, color: c.onSurfaceInverse },
+  title: { fontFamily: fonts.display, fontWeight: "700", fontSize: 22, color: c.onSurfaceInverse },
   sub: { fontFamily: fonts.text, fontSize: 14, color: c.onSurfaceInverse, opacity: 0.8 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   circleOuter: {
@@ -150,9 +150,9 @@ const useStyles = makeStyles((c) => ({
   },
   circleInner: { width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(220,227,219,0.35)" },
   centerText: { position: "absolute", alignItems: "center" },
-  timer: { fontFamily: fonts.display, fontSize: 48, color: c.onSurfaceInverse },
+  timer: { fontFamily: fonts.display, fontWeight: "700", fontSize: 48, color: c.onSurfaceInverse },
   breath: { fontFamily: fonts.text, fontSize: 14, letterSpacing: 2, color: c.onSurfaceInverse, opacity: 0.85, marginTop: space.xs },
-  step: { fontFamily: fonts.display, fontSize: 22, lineHeight: 31, color: c.onSurfaceInverse, textAlign: "center", minHeight: 96, marginBottom: space.xl },
+  step: { fontFamily: fonts.display, fontWeight: "700", fontSize: 22, lineHeight: 31, color: c.onSurfaceInverse, textAlign: "center", minHeight: 96, marginBottom: space.xl },
   controls: { alignItems: "center" },
   play: { width: 76, height: 76, borderRadius: 38, backgroundColor: c.brandTertiary, alignItems: "center", justifyContent: "center" },
 }));

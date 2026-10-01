@@ -1,9 +1,15 @@
 import Feather from "@react-native-vector-icons/feather";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
 import { fonts, makeStyles, radius, space, useTheme } from "@/src/theme";
+
+export function ScreenBg() {
+  const { colors } = useTheme();
+  return <LinearGradient pointerEvents="none" colors={[colors.bgTop, colors.bgBottom]} style={StyleSheet.absoluteFill} />;
+}
 
 export function tap(style: "light" | "medium" | "success" = "light") {
   if (Platform.OS === "web") return;
@@ -75,8 +81,11 @@ export function Button({
       testID={testID}
       onPress={onPress}
       disabled={disabled || loading}
-      style={[styles.btn, { backgroundColor: bg, opacity: disabled ? 0.5 : 1 }, style ?? {}]}
+      style={[styles.btn, { backgroundColor: variant === "primary" ? "transparent" : bg, opacity: disabled ? 0.5 : 1 }, style ?? {}]}
     >
+      {variant === "primary" ? (
+        <LinearGradient colors={[colors.gradStart, colors.gradEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+      ) : null}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
@@ -163,6 +172,7 @@ const useStyles = makeStyles((c) => ({
   btn: {
     minHeight: 52,
     borderRadius: radius.pill,
+    overflow: "hidden",
     paddingHorizontal: space.xl,
     alignItems: "center",
     justifyContent: "center",
@@ -204,7 +214,7 @@ const useStyles = makeStyles((c) => ({
     justifyContent: "center",
     marginBottom: space.lg,
   },
-  emptyTitle: { fontFamily: fonts.display, fontSize: 22, color: c.onSurface, textAlign: "center" },
+  emptyTitle: { fontFamily: fonts.display, fontWeight: "700", fontSize: 22, color: c.onSurface, textAlign: "center" },
   emptyBody: {
     fontFamily: fonts.text,
     fontSize: 15,

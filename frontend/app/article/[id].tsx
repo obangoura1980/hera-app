@@ -57,10 +57,10 @@ const useStyles = makeStyles((c) => ({
   fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   hero: { height: 380, backgroundColor: c.surfaceInverse },
   heroInner: { flex: 1, justifyContent: "flex-end", padding: space.xl },
-  meta: { fontFamily: fonts.text, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, color: c.brandTertiary },
-  title: { fontFamily: fonts.display, fontSize: 32, lineHeight: 38, color: c.onSurfaceInverse, marginTop: space.sm },
+  meta: { fontFamily: fonts.text, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, color: c.onSurfaceInverse },
+  title: { fontFamily: fonts.display, fontWeight: "700", fontSize: 32, lineHeight: 38, color: c.onSurfaceInverse, marginTop: space.sm },
   body: { padding: space.xl },
-  subtitle: { fontFamily: fonts.display, fontSize: 19, fontStyle: "italic", color: c.brandPrimary, marginBottom: space.lg },
+  subtitle: { fontFamily: fonts.display, fontWeight: "700", fontSize: 19, fontStyle: "italic", color: c.brandPrimary, marginBottom: space.lg },
   para: { fontFamily: fonts.text, fontSize: 17, lineHeight: 28, color: c.onSurfaceSecondary, marginBottom: space.lg },
   back: { position: "absolute", left: space.lg },
 }));
