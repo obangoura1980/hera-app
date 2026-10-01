@@ -52,6 +52,18 @@ const light = {
   scrim: "rgba(46,44,41,0.78)", // image scrim end stop
   scrimClear: "rgba(46,44,41,0)", // image scrim start stop
   gold: "#D5A05B", // premium accent
+  // Hera aura splash (original brand landing)
+  auraDeep: "#020408",
+  auraMid: "#060B1E",
+  auraBase: "#080A18",
+  auraViolet: "rgba(168,85,247,0.12)",
+  auraVioletLine: "rgba(168,85,247,0.3)",
+  auraPink: "rgba(236,72,153,0.06)",
+  auraPinkLine: "rgba(236,72,153,0.1)",
+  auraGlow: "rgba(124,58,237,0.95)",
+  auraAccent: "#F472B6",
+  auraHint: "rgba(255,255,255,0.26)",
+  auraText: "#FFFFFF",
 
   // ---------------------------------------------------------------------------
   // Brand: the identity color and the fills built from it.
