@@ -42,3 +42,9 @@
 - Home: emoji labels (🔥 ✨ 🔮 💜), Explore More link
 - Settings: version footer
 - Backlog: daily reminders, profile photo upload, Privacy & Data / Help & Support / Reset Journey / Delete Account rows, paywall bonus card and legal links
+
+## Update (2026-10-01) — Claude coach
+- Hera coach and affirmation generation now use Anthropic claude-sonnet-5-5 via Emergent Universal Key (streaming SSE)
+- Warm, spiritually grounded system prompt; personalized with user name + vision board goals; plain text replies
+- History: all messages stored in MongoDB (coach_messages); last 30 included as context each turn; clear button resets
+- Tested: backend 29/29, frontend chat flows pass

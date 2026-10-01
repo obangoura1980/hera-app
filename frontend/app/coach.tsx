@@ -173,7 +173,7 @@ const useStyles = makeStyles((c) => ({
   heraAvatar: { width: 40, height: 40 },
   title: { fontFamily: fonts.display, fontWeight: "700", fontSize: 22, color: c.onSurface },
   sub: { fontFamily: fonts.text, fontSize: 13, color: c.muted },
-  list: { padding: space.lg, gap: space.md, flexGrow: 1 },
+  list: { padding: space.lg, paddingBottom: space.xl, gap: space.md, flexGrow: 1 },
   empty: { alignItems: "center", paddingTop: space.xxxl, paddingHorizontal: space.xl },
   emptyAvatar: { width: 110, height: 110 },
   emptyTitle: { fontFamily: fonts.display, fontWeight: "700", fontSize: 26, color: c.onSurface, marginTop: space.lg },

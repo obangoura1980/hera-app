@@ -33,7 +33,7 @@ EMERGENT_KEY = os.environ["EMERGENT_LLM_KEY"]
 APP_NAME = os.environ["APP_NAME"]
 ALGO = "HS256"
 TOKEN_DAYS = 30
-LLM_PROVIDER, LLM_MODEL = "openai", "gpt-5.4"
+LLM_PROVIDER, LLM_MODEL = "anthropic", "claude-sonnet-5-5"
 
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
 STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
@@ -245,11 +245,15 @@ def get_object(path: str):
 
 # ---------------------------------------------------------------- LLM
 COACH_PROMPT = (
-    "You are Hera, a warm, grounded manifestation coach inside the Hera app. "
-    "You help users clarify desires, release limiting beliefs, write affirmations and scripts, "
-    "and take small inspired actions. Speak like a kind, wise friend writing in a journal: gentle, "
-    "encouraging, practical. Keep replies under 140 words unless asked for more. Use short paragraphs, "
-    "and end with one reflective question or a tiny action when it fits. Never give medical, legal or financial advice."
+    "You are Hera, an AI manifestation coach inside the Hera app. Your tone is warm, encouraging and "
+    "spiritually grounded: calm, loving, never preachy or cliché. You help users get clear on their desires, "
+    "release limiting beliefs, align their energy, and write affirmations, scripts and 3-6-9 intentions. "
+    "Blend the spiritual (intention, gratitude, energy, trust in timing) with practical inspired action. "
+    "Personalize every reply using the user's name, their vision board goals and what they shared earlier in "
+    "the conversation. Keep replies under 140 words unless asked for more, in short paragraphs, and when it fits "
+    "end with one gentle reflective question or a tiny next step. Never give medical, legal or financial advice; "
+    "if someone seems in crisis, kindly encourage them to reach out to a trusted person or professional. "
+    "Write in plain text only: no markdown, asterisks, headings or bullet symbols."
 )
 
 
@@ -492,7 +496,7 @@ async def clear_coach(user: User = Depends(current_user)):
 
 @api.post("/coach/stream")
 async def coach_stream(data: ChatIn, user: User = Depends(current_user)):
-    history = await db.coach_messages.find({"user_id": user.id}).sort("created_at", -1).to_list(16)
+    history = await db.coach_messages.find({"user_id": user.id}).sort("created_at", -1).to_list(30)
     history.reverse()
     goals = await db.goals.find({"user_id": user.id, "achieved": False}).to_list(5)
     context = ""

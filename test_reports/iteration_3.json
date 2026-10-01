@@ -1,0 +1,45 @@
+{
+  "summary": "Backend + frontend tested after Hera coach switched from GPT to Claude (anthropic/claude-sonnet-5-5) via emergentintegrations, with new 30-message history window and refreshed system prompt. Backend: 29/29 pytest cases pass across /app/backend/tests/ (21 existing regression + 8 new Claude-specific). New /app/backend/tests/test_coach_claude.py covers (a) SSE streaming of 'data: {delta}' then {done:true}, (b) reply personalization using the user's name ('Luna' included in reply), (c) plain-text format assertion (no **, no markdown headings/bullet symbols), (d) warm/spiritual tone heuristic markers, (e) context memory across turns ('My favorite color is lavender' -> 'what is my favorite color?' -> reply contains 'lavender'), (f) GET /api/coach/messages returns persisted user+assistant messages in correct chronological order, (g) DELETE /api/coach/messages clears thread (returns {ok:true}, subsequent GET -> []), (h) POST /api/affirmations/generate now driven by Claude returns a 5+ word first-person affirmation. Frontend 390x844 verified end-to-end for maya@hera.app/hera1234: Landing -> auth-toggle-mode-button (switch to Log in) -> auth-submit-button -> Home. home-desire-input + home-desire-send navigates to coach-screen with ?q= and auto-sends; first assistant streamed reply starts with 'Maya,' and references her existing vision-board goals ('your sea home and your Paris trip') plus a prior memory ('lavender') proving context + personalization work end-to-end. Second message via coach-message-input + coach-send-button streams second reply (assistant count 3->4). coach-prompt-chip-0 'Help me write an affirmation' sends and streams (4->5). coach-back-button returns home; home-chat-card re-opens coach with full history preserved (5 assistant messages). coach-clear-button clears thread -> coach-empty-state visible with 0 assistant bubbles. No red screens, no runtime errors. Only known non-blocking warning carried over from iteration_2: 'textShadow*' style props deprecated on Landing title.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Coach (/coach)", "issues": ["The horizontal prompt-chips row (coach-prompt-chip-*) sits visually on top of the last assistant bubble when the keyboard is dismissed and content fills past the viewport; the FlatList contentContainerStyle should reserve additional paddingBottom equal to chipRow height (56) + inputBar height so the last message title is never occluded by the chips/input bar. Reference: /app/frontend/app/coach.tsx:176 (styles.list) and :131-135 (chipRow)."]}
+    ],
+    "react_native_issues": [
+      {"component": "Landing title textShadow (carryover)", "issue": "Console warning: 'textShadow*' style props are deprecated. Use 'textShadow'. Reference: /app/frontend/app/index.tsx:127-129 (title uses textShadowColor/Offset/Radius). Already reported in iteration_2 and still unfixed."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hera_backend.py",
+    "/app/backend/tests/test_coach_claude.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/pytest_coach_claude.xml"
+  ],
+  "action_items": [
+    "Fix the known Landing textShadow deprecation (iteration_2 action item still open): migrate textShadowColor/Offset/Radius to the unified `textShadow` style prop in /app/frontend/app/index.tsx.",
+    "Add paddingBottom to /app/frontend/app/coach.tsx styles.list (chipRow height 56 + inputBar + safe inset) so the final message bubble is never covered by the floating prompt-chips row and input bar."
+  ],
+  "critical_code_review_comments": [
+    "server.py:36 pins LLM_PROVIDER='anthropic', LLM_MODEL='claude-sonnet-5-5' and all /coach/stream + /affirmations/generate go through emergentintegrations LlmChat with EMERGENT_LLM_KEY — switch is clean and consistent.",
+    "server.py:499-507 builds history context from the last 30 messages (sorted asc after reverse) and prepends vision-board goals + the user's name to the system message every turn; this is a solid memory strategy, no leakage across users since every query is scoped by user_id.",
+    "COACH_PROMPT at server.py:247-257 explicitly forbids markdown/asterisks/bullets; verified empirically that Claude obeys (test_reply_plain_text_no_markdown passes).",
+    "frontend/src/api.ts:75-104 streamCoach parses SSE deltas correctly, surfaces error events via ApiError and respects done; uses expo/fetch for streaming on web and native. OK.",
+    "frontend/app/coach.tsx:69-75 auto-sends ?q= exactly once (sentQ ref) and only after history query is successful — prevents double-send and empty-state flicker.",
+    "No MongoDB ObjectId leaks: ChatMessage.public() uses by_alias=False so _id becomes id.",
+    "/affirmations/generate uses a fresh session_id per call (good — no cross-user bleed) but does not persist generated affirmation; this is intentional per app design."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_coach_claude.py"
+  ],
+  "success_rate": {"backend": "100% (29/29)", "frontend": "100% of requested flows (one minor overlap design nit on coach)"},
+  "seed_data_creation": "Coach thread for maya@hera.app was populated during this run with 3 user + 3 assistant messages, then cleared via coach-clear-button at end of test. New TEST_* throwaway users created per test (test_coach_claude.py) are not cleaned up server-side — follows the pattern used by test_hera_backend.py and is low-risk since they are prefixed 'TEST_claude_'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Claude migration (claude-sonnet-5-5) for coach + affirmation generation is fully verified. Memory window = last 30 messages, scoped per user, and vision-board unachieved goals are injected into the system message. Coach auth: POST /api/coach/stream (Bearer), SSE events 'data: {\"delta\":...}' then 'data: {\"done\":true}'. Auth flow note: /auth loads in Register mode by default — tests must click [data-testid=auth-toggle-mode-button] before using existing creds (maya@hera.app / hera1234). All backend tests live under /app/backend/tests/ and run via `pytest backend/tests/ -v` with EXPO_PUBLIC_BACKEND_URL env var set.",
+  "rca_of_issue": "No functional bugs found. The only design nit is cosmetic: Coach FlatList contentContainerStyle (styles.list) has no reserved bottom padding to clear the floating chipRow + inputBar; when content grows the final bubble can sit under the chips/input bar until the user scrolls. Fix: set contentContainerStyle.paddingBottom = chipRow height (56) + input bar height (~72) + insets.bottom."
+}
