@@ -50,7 +50,10 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-audio",
+      "@react-native-vector-icons/ionicons",
+      "@react-native-vector-icons/material-icons"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,338 +1,556 @@
-import Feather from "@react-native-vector-icons/feather";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TextInput, View } from "react-native";
-import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator,
+} from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@react-native-vector-icons/ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay, runOnJS } from 'react-native-reanimated';
+import { useHera } from '@/hooks/useHera';
+import { useTheme } from '@/hooks/useTheme';
+import { useAuth, useAlert } from '@/template';
+import { pickAvatarImage, uploadAvatar, loadCachedAvatarUrl } from '@/services/avatarService';
+import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 
-import { api, fileSource, type Favorite, type Goal, type Session, type Stats } from "@/src/api";
-import { useAuth } from "@/src/auth";
-import { ErrorText, PressableScale, ScreenBg, tap } from "@/src/components/ui";
-import { useTabBottomSpace } from "@/src/navigation";
-import { makeStyles, radius, space, useTheme } from "@/src/theme";
+const TRENDING_ITEMS = [
+  'him obsessed with me',
+  '$10k weeks',
+  'Euro summer vacation',
+  'dream body glow up',
+  'true love finds me',
+  'financial freedom',
+  'dream apartment',
+  'get promoted',
+  '5AM morning routine',
+  'abundance mindset',
+];
 
-const TRENDING = ["him obsessed with me", "$10k weeks", "Europe trip", "dream job", "glowing skin", "my soulmate"];
+// ── Dynamic styles factory ────────────────────────────────────────────────────
+const createStyles = (c: ThemeColors, isDark: boolean) => StyleSheet.create({
+  root:   { flex: 1, backgroundColor: c.background },
+  scroll: { gap: 0 },
 
-export default function Home() {
-  const styles = useStyles();
-  const { colors, scheme } = useTheme();
+  // Top bar
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, marginBottom: Spacing.md,
+  },
+  // flexShrink: 0 prevents "HERA" from being squeezed by action buttons
+  appName: { fontSize: 22, color: c.textWhite, fontWeight: '800', letterSpacing: 3, flexShrink: 0 },
+  topActions: { flexDirection: 'row', gap: Spacing.sm, flexShrink: 0 },
+  topBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.78)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(168,85,247,0.3)' : 'rgba(0,0,0,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Orb
+  orbWrap: {
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.md, position: 'relative', height: 165,
+    backgroundColor: 'transparent',
+  },
+  orbGlow: { position: 'absolute', width: 200, height: 200, borderRadius: 100 },
+  orbInner: { position: 'relative', width: 160, height: 160, zIndex: 1, backgroundColor: 'transparent', borderWidth: 0 },
+  orb: { width: 160, height: 160, backgroundColor: 'transparent' },
+  orbPhoto: { width: 160, height: 160, borderRadius: 80 },
+  cameraBadge: {
+    position: 'absolute', bottom: 6, right: 2, width: 30, height: 30, borderRadius: 15,
+    backgroundColor: isDark ? '#14082E' : '#2D1520',
+    borderWidth: 2,
+    borderColor: isDark ? 'rgba(168,85,247,0.45)' : 'rgba(196,112,122,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Title section — split into two rows so the name wraps independently
+  titleWrap: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.lg,
+    gap: 2,
+    // Ensure the block never exceeds screen width
+    alignSelf: 'stretch',
+  },
+  // Name row: shrinks & wraps; max 2 lines with ellipsis for extreme cases
+  manifestName: {
+    fontSize: 30, color: c.textWhite, fontWeight: '700',
+    textAlign: 'center', lineHeight: 38,
+    flexShrink: 1, flexWrap: 'wrap',
+  },
+  // Fixed subtitle row — no dynamic content, always fits
+  manifestSubtitle: {
+    fontSize: 30, color: c.textWhite, fontWeight: '700',
+    textAlign: 'center', lineHeight: 44,
+  },
+  manifestItalic: { fontStyle: 'italic', color: c.primaryLight, fontWeight: '700' },
+
+  // Input capsule
+  inputCapsule: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: Spacing.lg,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.9)',
+    borderRadius: 50, borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,255,255,0.11)' : 'rgba(0,0,0,0.07)',
+    paddingLeft: Spacing.lg, paddingRight: 6, paddingVertical: 6,
+    marginBottom: Spacing.md,
+    shadowColor: isDark ? 'transparent' : '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0 : 0.07,
+    shadowRadius: 10,
+    elevation: isDark ? 0 : 3,
+  },
+  input: {
+    flex: 1, fontSize: FontSize.base, color: c.textWhite,
+    paddingVertical: Spacing.sm + 2, paddingRight: Spacing.sm,
+  },
+  submitBtn: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: isDark ? '#14082E' : '#2D1520',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: isDark ? 'rgba(168,85,247,0.55)' : 'rgba(196,112,122,0.45)',
+  },
+
+  // Trending
+  trendingSection: { marginBottom: Spacing.xl },
+  trendingLabel: {
+    fontSize: FontSize.xs, color: c.textSubtle, fontWeight: '700',
+    letterSpacing: 1.2, textAlign: 'center', marginBottom: Spacing.md,
+  },
+  chipsRow: { paddingHorizontal: Spacing.lg, gap: Spacing.sm },
+  chip: {
+    paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm + 3,
+    borderRadius: Radius.full, borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.09)',
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.82)',
+    shadowColor: isDark ? 'transparent' : '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: isDark ? 0 : 0.05,
+    shadowRadius: 4, elevation: isDark ? 0 : 2,
+  },
+  chipTxt: { fontSize: FontSize.sm, color: c.textMuted, fontWeight: '500' },
+
+  // For You header
+  forYouHeader: {
+    paddingHorizontal: Spacing.lg, marginBottom: Spacing.md,
+  },
+  forYouTitle: { fontSize: 30, color: c.textWhite, fontWeight: '700' },
+
+  // Cards
+  cardsWrap: { paddingHorizontal: Spacing.lg, gap: Spacing.md },
+  card: {
+    borderRadius: Radius.xl + 4, overflow: 'hidden', borderWidth: 1,
+    borderColor: isDark ? 'rgba(168,85,247,0.22)' : 'rgba(196,112,122,0.18)',
+    shadowColor: isDark ? 'transparent' : 'rgba(180,100,115,1)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0 : 0.12,
+    shadowRadius: 14, elevation: isDark ? 0 : 5,
+  },
+  cardGrad: { padding: Spacing.lg, gap: Spacing.sm, minHeight: 132, flex: 1 },
+  cardCat: { fontSize: FontSize.xs, color: c.primary, fontWeight: '700', letterSpacing: 0.4 },
+  cardTitle: { fontSize: FontSize.md, color: c.textWhite, fontWeight: '600', lineHeight: 26, flex: 1, flexShrink: 1 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  cardAction: {
+    fontSize: FontSize.xs, fontWeight: '600',
+    color: isDark ? 'rgba(255,255,255,0.48)' : 'rgba(26,10,20,0.4)',
+  },
+});
+
+// ── Toast static styles ───────────────────────────────────────────────────────
+const toastStyle = StyleSheet.create({
+  wrap: {
+    position: 'absolute',
+    right: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 10,
+    zIndex: 9999,
+  },
+  divider: {
+    width: 1,
+    height: 14,
+    backgroundColor: 'rgba(168,85,247,0.3)',
+    marginHorizontal: 2,
+  },
+  txt: {
+    fontSize: FontSize.sm,
+    fontWeight: '600',
+  },
+});
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const bottomSpace = useTabBottomSpace();
   const router = useRouter();
-  const qc = useQueryClient();
-  const { user } = useAuth();
-  const [desire, setDesire] = useState("");
-  const [aiText, setAiText] = useState<string | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const { colors: c, isDark } = useTheme();
+  const {
+    user, dailyAffirmation, favoriteAffirmations,
+    toggleFavoriteAffirmation, visionItems, isAuthenticated,
+  } = useHera();
+  const { user: authUser } = useAuth();
+  const { showAlert } = useAlert();
 
-  const stats = useQuery({ queryKey: ["stats"], queryFn: () => api<Stats>("/stats") });
-  const today = useQuery({ queryKey: ["aff-today"], queryFn: () => api<{ text: string }>("/affirmations/today") });
-  const sessions = useQuery({ queryKey: ["sessions"], queryFn: () => api<Session[]>("/sessions") });
-  const favs = useQuery({ queryKey: ["favorites"], queryFn: () => api<Favorite[]>("/affirmations/favorites") });
-  const goals = useQuery({ queryKey: ["goals"], queryFn: () => api<Goal[]>("/goals") });
+  // Toast animation shared values
+  const toastX = useSharedValue(200);
+  const toastOpacity = useSharedValue(0);
 
-  const pulse = useSharedValue(1);
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withSequence(withTiming(1.06, { duration: 2400, easing: Easing.inOut(Easing.sin) }), withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) })),
-      -1,
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setToastVisible(true);
+    toastX.value = 200;
+    toastOpacity.value = 0;
+    toastX.value = withTiming(0, { duration: 320 });
+    toastOpacity.value = withSequence(
+      withTiming(1, { duration: 280 }),
+      withDelay(1800, withTiming(0, { duration: 320 }, (finished) => {
+        if (finished) runOnJS(setToastVisible)(false);
+      }))
     );
-  }, [pulse]);
-  const orbStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+  }, []);
 
-  const text = aiText ?? today.data?.text ?? "";
-  const isFav = !!favs.data?.some((f) => f.text === text);
-  const name = (user?.name ?? "").split(" ")[0];
-
-  const askHera = (q: string) => {
-    const t = q.trim();
-    if (!t) return;
-    tap();
-    setDesire("");
-    router.push({ pathname: "/coach", params: { q: `I want to manifest: ${t}` } });
-  };
-  const affirm = async () => {
-    tap("success");
-    await api("/affirmations/affirm", { method: "POST" });
-    qc.invalidateQueries({ queryKey: ["stats"] });
-  };
-  const toggleFav = async () => {
-    const f = favs.data?.find((x) => x.text === text);
-    if (f) await api(`/affirmations/favorites/${f.id}`, { method: "DELETE" });
-    else await api("/affirmations/favorites", { method: "POST", body: { text } });
-    qc.invalidateQueries({ queryKey: ["favorites"] });
-  };
-  const generate = async () => {
-    setErr(null);
-    setAiBusy(true);
-    try {
-      setAiText((await api<{ text: string }>("/affirmations/generate", { method: "POST", body: { intention: "" } })).text);
-    } catch (e: any) {
-      setErr(e.message);
-    } finally {
-      setAiBusy(false);
+  const handleToggleFavorite = useCallback((aff: string) => {
+    if (!isAuthenticated) {
+      showAlert(
+        'Login Required',
+        'Please login first to save your favorite affirmations.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Login', onPress: () => router.push('/login') },
+        ],
+      );
+      return;
     }
+    const willSave = !favoriteAffirmations.includes(aff);
+    toggleFavoriteAffirmation(aff);
+    if (willSave) showToast('Daily Affirmation Saved');
+  }, [isAuthenticated, favoriteAffirmations, toggleFavoriteAffirmation, showAlert, router, showToast]);
+
+  const [manifestInput, setManifestInput] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMsg, setToastMsg] = useState('Daily Affirmation Saved');
+
+
+  const toastAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: toastX.value }],
+    opacity: toastOpacity.value,
+  }));
+
+  const s = useMemo(() => createStyles(c, isDark), [c, isDark]);
+
+  // Load cached avatar on mount
+  useEffect(() => {
+    loadCachedAvatarUrl().then(url => { if (url) setAvatarUrl(url); }).catch(() => {});
+  }, []);
+
+  const screenOpacity = useSharedValue(0);
+  const screenSlide = useSharedValue(10);
+
+  // Re-sync avatar each time this tab is focused (picks up changes from profile screen)
+  useFocusEffect(
+    useCallback(() => {
+      screenOpacity.value = 0;
+      screenSlide.value = 10;
+      screenOpacity.value = withTiming(1, { duration: 280 });
+      screenSlide.value = withTiming(0, { duration: 280 });
+      loadCachedAvatarUrl().then(url => setAvatarUrl(url ?? null)).catch(() => {});
+    }, [])
+  );
+
+  const screenAnimStyle = useAnimatedStyle(() => ({
+    opacity: screenOpacity.value,
+    transform: [{ translateY: screenSlide.value }],
+  }));
+
+  const handlePickAvatar = useCallback(async () => {
+    if (!authUser?.id) {
+      showAlert('Sign In Required', 'Please sign in to upload a custom photo.');
+      return;
+    }
+    const localUri = await pickAvatarImage();
+    if (!localUri) return;
+    setAvatarUploading(true);
+    try {
+      const publicUrl = await uploadAvatar(localUri, authUser.id);
+      setAvatarUrl(publicUrl);
+    } catch (e: any) {
+      showAlert('Upload Failed', e.message || 'Could not upload photo. Please try again.');
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [authUser, showAlert]);
+
+  const rawName = user.name.trim() || 'Beautiful Soul';
+  // Cap display name at 28 chars so very long names never break the title layout
+  const displayName = rawName.length > 28
+    ? rawName.slice(0, 28).trimEnd() + '\u2026'
+    : rawName;
+
+  const isFav = favoriteAffirmations.includes(dailyAffirmation);
+
+  // ── Theme-adaptive values ──────────────────────────────────────────────────
+  const bgColors = isDark
+    ? (['#080A18', '#0D1035', '#131838'] as const)
+    : (['#FDE8EA', '#F9D5D9', '#F5C2C7'] as const);
+
+  const orbGlowColor = isDark ? 'rgba(140,60,220,0.28)' : 'rgba(212,140,40,0.2)';
+
+  const forYouGradients: [string, string][] = isDark ? [
+    ['rgba(168,85,247,0.32)', 'rgba(109,40,217,0.14)'],
+    ['rgba(236,72,153,0.28)', 'rgba(168,85,247,0.12)'],
+    ['rgba(109,40,217,0.28)', 'rgba(236,72,153,0.1)'],
+  ] : [
+    ['rgba(255,255,255,0.92)', 'rgba(255,238,241,0.78)'],
+    ['rgba(255,255,255,0.88)', 'rgba(255,232,237,0.72)'],
+    ['rgba(255,255,255,0.9)',  'rgba(255,235,240,0.75)'],
+  ];
+
+  const handleSubmit = () => {
+    if (!manifestInput.trim()) return;
+    router.push({
+      pathname: '/(tabs)/chat',
+      params: { initialMessage: manifestInput.trim(), msgTimestamp: Date.now().toString() },
+    });
+    setManifestInput('');
   };
 
-  const pinned = goals.data ?? [];
+  const forYouCards = useMemo(() => [
+    {
+      id: 'affirmation',
+      category: '✨  Daily Affirmation',
+      title: dailyAffirmation,
+      gradientIndex: 0,
+      action: () => router.push('/(tabs)/discover'),
+      actionLabel: 'Explore More',
+    },
+    {
+      id: 'vision',
+      category: '🔮  Vision Board',
+      title: visionItems[0]?.title
+        ? `"${visionItems[0].title}" — ${visionItems[0].progress}% manifested`
+        : 'Add your first dream to your vision board',
+      gradientIndex: 1,
+      action: () => router.push('/(tabs)/vision'),
+      actionLabel: 'View Board',
+    },
+    {
+      id: 'chat',
+      category: '💜  Chat with Hera',
+      title: 'Your AI coach is ready. Share what you want to manifest today.',
+      gradientIndex: 2,
+      action: () => router.push('/(tabs)/chat'),
+      actionLabel: 'Start Chat',
+    },
+  ], [dailyAffirmation, visionItems]);
 
   return (
-    <View style={styles.root} testID="today-screen">
-      <ScreenBg />
+    <Animated.View style={[s.root, screenAnimStyle]}>
+      <LinearGradient colors={bgColors} style={StyleSheet.absoluteFill} />
+
+      {/* ── Saved Toast ───────────────────────────────────────── */}
+      {toastVisible ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            toastStyle.wrap,
+            { top: insets.top + 56 },
+            toastAnimStyle,
+            {
+              backgroundColor: isDark
+                ? 'rgba(30,20,50,0.96)'
+                : 'rgba(255,255,255,0.97)',
+              borderColor: isDark
+                ? 'rgba(236,72,153,0.45)'
+                : 'rgba(196,112,122,0.4)',
+            },
+          ]}
+        >
+          <Ionicons name="heart" size={14} color={isDark ? '#EC4899' : '#C4707A'} />
+          <View style={toastStyle.divider} />
+          <Text style={[toastStyle.txt, { color: isDark ? 'rgba(255,255,255,0.92)' : 'rgba(26,10,20,0.85)' }]}>
+            {toastMsg}
+          </Text>
+          <Ionicons name="checkmark-circle" size={14} color={isDark ? '#A855F7' : '#9333EA'} />
+        </Animated.View>
+      ) : null}
+
+
       <ScrollView
-        contentContainerStyle={{ paddingTop: insets.top + space.md, paddingBottom: bottomSpace }}
-        refreshControl={<RefreshControl refreshing={false} onRefresh={() => qc.invalidateQueries()} tintColor={colors.brandPrimary} />}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          s.scroll,
+          { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + 130 },
+        ]}
       >
-        <View style={styles.header}>
-          <Text style={styles.logo}>HERA</Text>
-          <View style={{ flexDirection: "row", gap: space.md }}>
-            <PressableScale testID="today-profile-button" onPress={() => router.push("/(tabs)/profile")} style={styles.headBtn}>
-              <Feather name="heart" size={20} color={colors.brandSecondary} />
-            </PressableScale>
-            <PressableScale testID="home-history-button" onPress={() => router.push("/(tabs)/journal")} style={styles.headBtn}>
-              <Feather name="clock" size={20} color={colors.brandSecondary} />
-            </PressableScale>
+        {/* ── Top bar ──────────────────────────────────────────── */}
+        <View style={s.topBar}>
+          <Text style={s.appName}>HERA</Text>
+          <View style={s.topActions}>
+            <Pressable
+              onPress={() => handleToggleFavorite(dailyAffirmation)}
+              style={[
+                s.topBtn,
+                isFav && {
+                  backgroundColor: isDark ? 'rgba(236,72,153,0.15)' : 'rgba(196,112,122,0.12)',
+                  borderColor: isDark ? 'rgba(236,72,153,0.3)' : 'rgba(196,112,122,0.3)',
+                },
+              ]}
+              hitSlop={10}
+            >
+              <Ionicons
+                name={isFav ? 'heart' : 'heart-outline'}
+                size={18}
+                color={isFav ? c.primary : c.textMuted}
+              />
+            </Pressable>
+            <Pressable onPress={() => router.push('/(tabs)/chat')} style={s.topBtn} hitSlop={10}>
+              <Ionicons name="time-outline" size={18} color={c.textMuted} />
+            </Pressable>
           </View>
         </View>
 
-        <Animated.View entering={FadeIn.duration(700)} style={styles.halo}>
-          <Animated.View style={orbStyle}>
-            <Image
-              testID="home-hera-orb"
-              source={scheme === "dark" ? require("../../assets/images/hera-orb.png") : require("../../assets/images/hera-orb-light.png")}
-              style={styles.orb}
-              contentFit="contain"
-            />
-          </Animated.View>
-        </Animated.View>
+        {/* ── Orb / Avatar ─────────────────────────────────────── */}
+        <View style={s.orbWrap}>
+          <View style={[s.orbGlow, { backgroundColor: orbGlowColor }]} />
+          <View style={s.orbInner}>
+            {avatarUrl ? (
+              <Image
+                source={{ uri: avatarUrl }}
+                style={s.orbPhoto}
+                contentFit="cover"
+                contentPosition="center"
+                transition={300}
+              />
+            ) : (
+              <Image
+                source={
+                  isDark
+                    ? require('@/assets/images/hera-orb.png')
+                    : require('@/assets/images/hera-orb-light.png')
+                }
+                style={s.orb}
+                contentFit="contain"
+                contentPosition="center"
+                transition={400}
+              />
+            )}
+            <Pressable
+              onPress={handlePickAvatar}
+              disabled={avatarUploading}
+              style={({ pressed }) => [s.cameraBadge, pressed && { opacity: 0.7 }]}
+              hitSlop={8}
+              accessibilityLabel="Upload profile photo"
+            >
+              {avatarUploading
+                ? <ActivityIndicator size={11} color="white" />
+                : <Ionicons name="camera" size={13} color="white" />}
+            </Pressable>
+          </View>
+        </View>
 
-        <Text style={styles.ask} testID="today-user-name">
-          {name ? `${name}, ` : ""}what do you{"\n"}want to <Text style={styles.askAccent}>manifest?</Text>
-        </Text>
+        {/* ── Manifest title ──────────────────────────────────── */}
+        {/*
+          Split into two rows so the dynamic name and the fixed subtitle
+          wrap and constrain independently — prevents horizontal overflow
+          when the user has a long name.
+        */}
+        <View style={s.titleWrap}>
+          {/* Name row: up to 2 lines, truncates with ellipsis beyond that */}
+          <Text style={s.manifestName} numberOfLines={2} ellipsizeMode="tail">
+            {displayName},
+          </Text>
+          {/* Static subtitle: never overflows */}
+          <Text style={s.manifestSubtitle}>
+            {'what do you want to '}
+            <Text style={s.manifestItalic}>manifest?</Text>
+          </Text>
+        </View>
 
-        <View style={styles.inputPill}>
+        {/* ── Input capsule ────────────────────────────────────── */}
+        <View style={s.inputCapsule}>
           <TextInput
-            testID="home-desire-input"
-            style={styles.input}
-            value={desire}
-            onChangeText={setDesire}
+            value={manifestInput}
+            onChangeText={setManifestInput}
             placeholder="him obsessed with me..."
-            placeholderTextColor={colors.muted}
-            onSubmitEditing={() => askHera(desire)}
+            placeholderTextColor={isDark ? 'rgba(255,255,255,0.22)' : 'rgba(26,10,20,0.3)'}
+            style={s.input}
+            onSubmitEditing={handleSubmit}
             returnKeyType="send"
           />
-          <PressableScale testID="home-desire-send" onPress={() => askHera(desire)} style={styles.send}>
-            <Feather name="arrow-up" size={22} color={colors.onAction} />
-          </PressableScale>
+          <Pressable
+            onPress={handleSubmit}
+            style={({ pressed }) => [s.submitBtn, pressed && { opacity: 0.78 }]}
+          >
+            <Ionicons name="arrow-up" size={20} color="white" />
+          </Pressable>
         </View>
 
-        <View style={styles.trendLabel}>
-          <Text style={styles.emoji}>🔥</Text>
-          <Text style={styles.trendText}>TRENDING MANIFESTATIONS</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendRow} keyboardShouldPersistTaps="handled">
-          {TRENDING.map((t, i) => (
-            <PressableScale key={t} testID={`home-trending-chip-${i}`} onPress={() => askHera(t)} style={styles.trendChip}>
-              <Text style={styles.trendChipText}>{t}</Text>
-            </PressableScale>
-          ))}
-        </ScrollView>
-
-        <View style={styles.forYouRow}>
-          <Text style={styles.forYou}>For you</Text>
-          <PressableScale testID="home-add-desire-button" onPress={() => router.push("/goal-new")} style={styles.editBtn}>
-            <Feather name="edit-2" size={15} color={colors.brandSecondary} />
-            <Text style={styles.editText}>Edit desires</Text>
-          </PressableScale>
-        </View>
-
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.cardWrap} testID="today-affirmation-card">
-          <LinearGradient colors={[colors.cardGradA, colors.cardGradB]} style={styles.card}>
-            <View style={styles.cardLabelRow}>
-              <Text style={styles.emoji}>✨</Text>
-              <Text style={styles.cardLabel}>{aiText ? "Written for you by Hera" : "Daily Affirmation"}</Text>
-              <View style={{ flex: 1 }} />
-              <View style={styles.streak} testID="today-streak-badge">
-                <Feather name="zap" size={13} color={colors.gold} />
-                <Text style={styles.streakText}>{stats.data?.streak ?? 0}-day streak</Text>
-              </View>
-            </View>
-            {today.isLoading ? (
-              <ActivityIndicator color={colors.brandPrimary} />
-            ) : (
-              <Animated.Text key={text} entering={FadeIn.duration(500)} style={styles.affText} testID="today-affirmation-text">
-                {text}
-              </Animated.Text>
-            )}
-            <View style={styles.affActions}>
-              <PressableScale testID="today-affirm-button" onPress={affirm} haptic={null} style={styles.affirmBtn}>
-                <LinearGradient colors={[colors.gradStart, colors.gradEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.fill} />
-                <Feather name={stats.data?.affirmed_today ? "check" : "heart"} size={16} color={colors.onBrandPrimary} />
-                <Text style={styles.affirmText}>{stats.data?.affirmed_today ? "Affirmed today" : "I affirm this"}</Text>
-              </PressableScale>
-              <PressableScale testID="today-favorite-button" onPress={toggleFav} style={styles.roundBtn}>
-                <Feather name="bookmark" size={18} color={isFav ? colors.gold : colors.brandSecondary} />
-              </PressableScale>
-              <PressableScale testID="today-generate-button" onPress={generate} disabled={aiBusy} style={styles.roundBtn}>
-                {aiBusy ? <ActivityIndicator size="small" color={colors.brandSecondary} /> : <Feather name="refresh-cw" size={18} color={colors.brandSecondary} />}
-              </PressableScale>
-            </View>
-            <PressableScale testID="home-explore-more" onPress={() => router.push("/(tabs)/discover")} style={styles.explore}>
-              <Text style={styles.exploreText}>Explore More</Text>
-              <Feather name="arrow-right" size={15} color={colors.brandSecondary} />
-            </PressableScale>
-            <ErrorText msg={err} testID="today-error-text" />
-          </LinearGradient>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(500).delay(100)} style={styles.cardWrap}>
-          <PressableScale testID="home-vision-card" onPress={() => router.push("/vision")}>
-            <LinearGradient colors={[colors.visionGradA, colors.visionGradB]} style={styles.card}>
-              <View style={styles.cardLabelRow}>
-                <Text style={styles.emoji}>🔮</Text>
-                <Text style={styles.cardLabel}>Vision Board</Text>
-              </View>
-              <Text style={styles.visionTitle}>
-                {pinned.length
-                  ? `"${pinned[0].title}" — ${Math.round(((stats.data?.goals_achieved ?? 0) / pinned.length) * 100)}% manifested`
-                  : "Pin your first dream"}
-              </Text>
-              <View style={styles.thumbs}>
-                {pinned.slice(0, 3).map((g) => (
-                  <View key={g.id} style={styles.thumb}>
-                    {g.image_path || g.image_url ? (
-                      <Image source={g.image_path ? fileSource(g.image_path) : { uri: g.image_url! }} style={styles.fill} contentFit="cover" />
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-              <View style={styles.explore}>
-                <Text style={styles.exploreText}>View Board</Text>
-                <Feather name="arrow-right" size={15} color={colors.brandSecondary} />
-              </View>
-            </LinearGradient>
-          </PressableScale>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.duration(500).delay(150)} style={styles.cardWrap}>
-          <PressableScale testID="home-chat-card" onPress={() => router.push("/coach")}>
-            <LinearGradient colors={[colors.cardGradA, colors.cardGradB]} style={styles.card}>
-              <View style={styles.cardLabelRow}>
-                <Text style={styles.emoji}>💜</Text>
-                <Text style={styles.cardLabel}>Chat with Hera</Text>
-              </View>
-              <Text style={styles.visionTitle}>Your AI coach is ready. Share what you want to manifest today.</Text>
-              <View style={styles.explore}>
-                <Text style={styles.exploreText}>Start Chat</Text>
-                <Feather name="arrow-right" size={15} color={colors.brandSecondary} />
-              </View>
-            </LinearGradient>
-          </PressableScale>
-        </Animated.View>
-
-        <View style={styles.statsRow}>
-          {[
-            { k: "journal_count", label: "Entries" },
-            { k: "goals_achieved", label: "Manifested" },
-            { k: "sessions_done", label: "Sessions" },
-          ].map((s) => (
-            <View key={s.k} style={styles.stat} testID={`today-stat-${s.k}`}>
-              <Text style={styles.statNum}>{(stats.data as any)?.[s.k] ?? 0}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </View>
-          ))}
+        {/* ── Trending ─────────────────────────────────────────── */}
+        <View style={s.trendingSection}>
+          <Text style={s.trendingLabel}>🔥  TRENDING MANIFESTATIONS</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.chipsRow}
+          >
+            {TRENDING_ITEMS.map((item, i) => (
+              <Pressable
+                key={i}
+                onPress={() => setManifestInput(item)}
+                style={({ pressed }) => [s.chip, pressed && { opacity: 0.72 }]}
+              >
+                <Text style={s.chipTxt}>{item}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
 
-        <Text style={styles.section}>Guided visualizations</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sessionRow}>
-          {(sessions.data ?? []).map((s) => (
-            <PressableScale
-              key={s.id}
-              testID={`today-session-${s.id}`}
-              onPress={() => router.push({ pathname: "/visualization", params: { id: s.id } })}
-              style={styles.sessionCard}
+        {/* ── For You header ───────────────────────────────────── */}
+        <View style={s.forYouHeader}>
+          <Text style={s.forYouTitle}>For you</Text>
+        </View>
+
+        {/* ── For You cards ────────────────────────────────────── */}
+        <View style={s.cardsWrap}>
+          {forYouCards.map(card => (
+            <Pressable
+              key={card.id}
+              onPress={card.action}
+              style={({ pressed }) => [s.card, pressed && { opacity: 0.86 }]}
             >
-              <Image source={{ uri: s.image }} style={styles.fill} contentFit="cover" />
-              <LinearGradient colors={[colors.scrimClear, colors.scrim]} style={styles.fill} />
-              <View style={styles.sessionInner}>
-                <Text style={styles.sessionMeta}>
-                  {s.minutes} MIN · {s.category.toUpperCase()}
-                </Text>
-                <Text style={styles.sessionTitle}>{s.title}</Text>
-              </View>
-            </PressableScale>
+              <LinearGradient
+                colors={forYouGradients[card.gradientIndex]}
+                style={s.cardGrad}
+              >
+                <Text style={s.cardCat}>{card.category}</Text>
+                <Text style={s.cardTitle} numberOfLines={3}>{card.title}</Text>
+                <View style={s.cardFooter}>
+                  <Text style={s.cardAction}>{card.actionLabel}</Text>
+                  <Ionicons
+                    name="arrow-forward"
+                    size={13}
+                    color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(26,10,20,0.35)'}
+                  />
+                </View>
+              </LinearGradient>
+            </Pressable>
           ))}
-        </ScrollView>
+        </View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
-
-const useStyles = makeStyles((c) => ({
-  root: { flex: 1, backgroundColor: c.surface },
-  fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  emoji: { fontSize: 15 },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.xl },
-  logo: { fontSize: 26, fontWeight: "900", letterSpacing: 6, color: c.onSurface },
-  headBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceSecondary, borderWidth: 1, borderColor: c.border },
-  halo: { alignSelf: "center", width: 220, height: 220, borderRadius: 110, backgroundColor: c.orbHalo, alignItems: "center", justifyContent: "center", marginTop: space.xl },
-  orb: { width: 120, height: 120 },
-  ask: { fontSize: 30, lineHeight: 40, fontWeight: "800", color: c.onSurface, textAlign: "center", marginTop: space.xl, paddingHorizontal: space.xl },
-  askAccent: { fontStyle: "italic", color: c.accentText },
-  inputPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: space.xl,
-    marginTop: space.xl,
-    height: 64,
-    borderRadius: 32,
-    paddingLeft: space.xl,
-    paddingRight: 6,
-    backgroundColor: c.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: c.border,
-  },
-  input: { flex: 1, fontSize: 16, color: c.onSurface, height: 60 },
-  send: { width: 52, height: 52, borderRadius: 26, backgroundColor: c.action, borderWidth: 1.5, borderColor: c.brandPrimary, alignItems: "center", justifyContent: "center" },
-  trendLabel: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, marginTop: space.xl },
-  trendText: { fontSize: 12, fontWeight: "700", letterSpacing: 2.5, color: c.muted },
-  trendRow: { paddingHorizontal: space.xl, gap: space.sm, paddingTop: space.md, height: 56 },
-  trendChip: { height: 44, paddingHorizontal: space.xl, borderRadius: radius.pill, backgroundColor: c.surfaceSecondary, borderWidth: 1, borderColor: c.border, justifyContent: "center", flexShrink: 0 },
-  trendChipText: { fontSize: 15, color: c.onSurfaceTertiary, fontWeight: "500" },
-  forYouRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.xl, marginTop: space.xxl, marginBottom: space.lg },
-  forYou: { fontSize: 30, fontWeight: "800", color: c.onSurface },
-  editBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border, backgroundColor: c.surfaceSecondary },
-  editText: { fontSize: 14, fontWeight: "600", color: c.brandSecondary },
-  cardWrap: { marginHorizontal: space.xl, marginBottom: space.lg, borderRadius: 24, overflow: "hidden", borderWidth: 1, borderColor: c.border },
-  card: { padding: space.xl },
-  cardLabelRow: { flexDirection: "row", alignItems: "center", gap: space.sm, marginBottom: space.md },
-  cardLabel: { fontSize: 13, fontWeight: "700", letterSpacing: 0.5, color: c.brandSecondary },
-  streak: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: space.sm, height: 26, borderRadius: radius.pill, backgroundColor: c.brandTertiary },
-  streakText: { fontSize: 12, fontWeight: "700", color: c.gold },
-  affText: { fontSize: 21, lineHeight: 30, fontWeight: "600", color: c.onSurface },
-  affActions: { flexDirection: "row", alignItems: "center", gap: space.sm, marginTop: space.xl },
-  affirmBtn: { flex: 1, height: 48, borderRadius: radius.pill, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm },
-  affirmText: { fontSize: 15, fontWeight: "700", color: c.onBrandPrimary },
-  roundBtn: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceSecondary },
-  visionTitle: { fontSize: 19, fontWeight: "700", color: c.onSurface },
-  thumbs: { flexDirection: "row", gap: space.sm, marginTop: space.lg },
-  thumb: { width: 64, height: 80, borderRadius: radius.md, overflow: "hidden", backgroundColor: c.surfaceTertiary },
-  explore: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: space.lg },
-  exploreText: { fontSize: 14, fontWeight: "600", color: c.brandSecondary },
-  statsRow: { flexDirection: "row", gap: space.md, paddingHorizontal: space.xl, marginTop: space.sm },
-  stat: { flex: 1, backgroundColor: c.surfaceSecondary, borderRadius: 18, padding: space.md, alignItems: "center", borderWidth: 1, borderColor: c.border },
-  statNum: { fontSize: 24, fontWeight: "800", color: c.onSurface },
-  statLabel: { fontSize: 12, color: c.muted, marginTop: 2 },
-  section: { fontSize: 22, fontWeight: "800", color: c.onSurface, paddingHorizontal: space.xl, marginTop: space.xxl, marginBottom: space.md },
-  sessionRow: { paddingHorizontal: space.xl, gap: space.md },
-  sessionCard: { width: 200, height: 240, borderRadius: radius.lg, overflow: "hidden", backgroundColor: c.surfaceTertiary },
-  sessionInner: { flex: 1, justifyContent: "flex-end", padding: space.lg },
-  sessionMeta: { fontSize: 11, fontWeight: "800", letterSpacing: 1, color: c.onSurfaceInverse, opacity: 0.8 },
-  sessionTitle: { fontSize: 20, fontWeight: "700", color: c.onSurfaceInverse, marginTop: space.xs },
-}));

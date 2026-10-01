@@ -1,0 +1,50 @@
+{
+  "summary": "Backend fully verified (13/13 new pytest cases pass) and frontend smoke-tested at 390x844 after the Emergent app was replaced with the ported Hera OnSpace repo (Supabase shim + email OTP + Claude hera-chat). Backend new endpoints: POST /api/auth/otp/send returns 200 ok, 429 within 30s, 404 when should_create_user=false and email unknown; POST /api/auth/otp/verify rejects invalid code (400), enforces 5-attempt limit (429 after), auto-registers unknown email on valid code and returns {access_token, token_type, user} with lowercased email; GET /api/subscription returns {subscribed:false, plan:'free'} by default and flips to subscribed/'yearly' after POST /api/premium/activate; DELETE /api/account removes the user (subsequent /auth/me -> 401); POST /api/hera-chat works streaming (OpenAI-style 'data:{choices:[{delta:{content}}]}' terminated by 'data: [DONE]') and non-stream ({content:'...'}), rejects empty messages (400) and also accepts anonymous (no Bearer) requests - matching the original repo contract. Frontend: Landing 'tap anywhere to begin' loads cleanly (no red screen); welcome screen 'Create the life you desire' + Continue leads into the 20-step onboarding quiz (reached 3/20 'First, what should I call you?' with name text input); 'Already have an account? Log in' routes to /login 'Welcome Back' screen with email input + 'Sign In' button; Sign In correctly posts /api/auth/otp/send with should_create_user:false and surfaces an in-app 'Account Not Found' alert for new emails (expected flow). Icons render (vector fonts prewarmed in _layout.tsx). Non-blocking console warnings only.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Login (/login)", "issues": [
+        "The large block of pink/salmon text 'Welcome Back' and the pink 'Sign In' button use near-identical hues on a very light pink background — contrast is below WCAG AA for small text; raise text to a darker accent and keep the gradient only on the button. Reference: /app/frontend/app/login.tsx.",
+        "'Sign In' is misleading - the screen rejects new emails with 'Account Not Found'. Rename to 'Continue' or 'Email me a code' and route new emails into /onboarding automatically after the alert's OK (currently the alert text says it will, but we did not verify the actual nav)."
+      ]}
+    ],
+    "react_native_issues": [
+      {"component": "Deprecated style props (carryover)", "issue": "Console warnings: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' and '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Multiple occurrences across the ported Hera screens (login, onboarding, landing). Reference: /app/frontend/app/index.tsx and ported /components/*.tsx."},
+      {"component": "props.pointerEvents deprecated", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' - fires on splash/landing. Reference: ported Hera components."},
+      {"component": "Animated useNativeDriver on web", "issue": "Console warning: 'Animated: `useNativeDriver` is not supported ... Falling back to JS-based animation'. Benign on web but spams the log; guard with Platform.OS !== 'web' or set useNativeDriver:false on web."},
+      {"component": "Require cycle in services/iapService.web.ts", "issue": "Console warning: 'Require cycle: services/iapService.web.ts -> services/iapService.web.ts'. The web stub self-imports; break the cycle."},
+      {"component": "expo-notifications push token on web", "issue": "Console warning: '[expo-notifications] Listening to push token changes is not yet fully supported on web. Adding a listener will have no effect'. Not crashing on web, acceptable per request, but gate the listener behind Platform.OS !== 'web' to silence."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hera_otp_chat.py",
+    "/app/test_reports/pytest/pytest_hera_otp_chat.xml"
+  ],
+  "action_items": [
+    "Full tabs / journal / vision / discover / chat UI walk-through was NOT exercised end-to-end because reaching /(tabs) requires either completing the 20-step onboarding or an authenticated session (OTP code is email-only; our backend-seeded code works through API but writing a token into the web AsyncStorage/IndexedDB from Playwright is non-trivial). Main agent should either (a) add a 'dev login' testID or (b) have the testing agent plow through all 20 onboarding steps - please pass seed data or a backdoor for future UI runs.",
+    "Rename /login primary button from 'Sign In' to 'Continue' or 'Email me a code' and auto-navigate new emails to /onboarding when the alert's OK is tapped (verify current behavior).",
+    "Fix deprecation warnings in ported Hera components: textShadow* -> textShadow, shadow* -> boxShadow, props.pointerEvents -> style.pointerEvents.",
+    "Break the require cycle inside services/iapService.web.ts (self-reference).",
+    "Gate expo-notifications listener and Animated useNativeDriver behind Platform.OS !== 'web' to clean up console warnings on preview."
+  ],
+  "critical_code_review_comments": [
+    "server.py:734 /auth/otp/send normalizes email with .strip().lower() but the DB seed logic in tests must match — this trip-wired my first run (initial 4 failed tests), fixed by lowercasing in the test fixture. Document this on the OTP contract for future testers.",
+    "server.py:752-760 /auth/otp/verify compares rec['expires_at'].replace(tzinfo=utc) < now_utc() — correct, since motor returns naive datetimes while BSON stores UTC-equivalent values.",
+    "server.py:788-828 /hera-chat is anonymous-friendly (creds optional); fine per the ported repo contract, but worth noting - any user can burn Claude credits unauthenticated. Consider a soft rate limit by IP for abuse protection.",
+    "template/core/emergent-client.ts cleanly shims the Supabase surface; no cross-user leakage because every API call goes through api(...) which pulls the per-session token from storage.secureGet.",
+    "src/utils/async-storage.ts adapter correctly serializes values as raw strings using the storage util; good.",
+    "frontend/app/_layout.tsx:50-53 prewarms Ionicons + MaterialIcons via expo-font — verified icons render (no missing-glyph boxes seen on landing/login).",
+    "No MongoDB _id leaks across public() methods; subscription/account/premium endpoints all return clean JSON."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_hera_otp_chat.py"
+  ],
+  "success_rate": {"backend": "100% (13/13 new + prior regression unchanged)", "frontend": "Partial - landing + onboarding entry + login screen + OTP-send API verified; tabs/chat/journal/vision/profile UI not exercised due to auth bootstrap limitation (see action_items)."},
+  "seed_data_creation": "Backend tests create TEST_* throwaway users and clean up users for the valid-code and delete-account cases. Several TEST_* otps and users may linger from parallel runs - low-risk, consistent with existing suite style.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend contract: /api/auth/otp/send lowercases emails and rate-limits per-email at 30s; /api/auth/otp/verify requires lowercased email in DB index. To seed OTP for UI tests, use the sha256(email.lower()+':'+code+':'+JWT_SECRET) scheme (JWT_SECRET from backend/.env). /api/hera-chat SSE events use OpenAI shape: 'data: {\"choices\":[{\"delta\":{\"content\":\"...\"}}]}' then 'data: [DONE]'. The /login screen is EXISTING-USER-ONLY (should_create_user=false) and 404s otherwise; new users must go through /onboarding first.",
+  "rca_of_issue": "No functional bug found. The only test-authoring gotcha was that server lowercases emails in /auth/otp/send and /auth/otp/verify — initial pytest run failed with 'Code expired. Please request a new one' because the seeded doc used mixed-case email but the server's SELECT uses lowercased. Fixed in /app/backend/tests/test_hera_otp_chat.py _set_otp fixture; all 13 cases now pass."
+}

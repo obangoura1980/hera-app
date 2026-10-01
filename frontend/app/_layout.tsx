@@ -1,60 +1,74 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, LogBox, View } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
+import { Stack } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { View, ActivityIndicator } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { AlertProvider, AuthProvider } from '@/template';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { HeraProvider } from '@/contexts/HeraContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import { useHera } from '@/hooks/useHera';
+import { useTheme } from '@/hooks/useTheme';
+import { initNotifications } from '@/services/notificationService';
+import { useFonts } from 'expo-font';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { AuthProvider } from "@/src/auth";
-import { ErrorBoundary } from "@/src/components/error-boundary";
-import { queryClient } from "@/src/query-client";
-import { setThemeOverride, useTheme } from "@/src/theme";
-import { storage } from "@/src/utils/storage";
+function AppContent() {
+  const { isLoading } = useHera();
+  const { isDark, colors } = useTheme();
 
-// Disable logbox errors etc so that users can see the app
-// and agent works as expected.
-LogBox.ignoreAllLogs(true);
+  useEffect(() => {
+    initNotifications().catch(() => {});
+  }, []);
 
-// Re-apply the user's saved appearance choice (dark / light) on launch.
-storage.getItem<string | null>("hera_theme", null).then((v) => {
-  if (v === "dark" || v === "light") setThemeOverride(v);
-});
-
-export default function RootLayout() {
-  const { colors, scheme } = useTheme();
-  // Prewarm the icon font so icons render on Expo Go Android.
-  const [loaded, error] = useFonts({
-    Feather: require("@react-native-vector-icons/feather/fonts/Feather.ttf"),
-  });
-
-  if (!loaded && !error) {
+  if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator color={colors.brandPrimary} />
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.gold} size="large" />
       </View>
     );
   }
-
-  // One app level ErrorBoundary; a render crash shows a reload screen
-  // instead of a blank app.
   return (
-    <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <QueryClientProvider client={queryClient}>
-          <KeyboardProvider>
-            <AuthProvider>
-              <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }}>
-                <Stack.Screen name="journal-new" options={{ presentation: "modal" }} />
-                <Stack.Screen name="goal-new" options={{ presentation: "modal" }} />
-                <Stack.Screen name="premium" options={{ presentation: "modal" }} />
-                <Stack.Screen name="visualization" options={{ presentation: "fullScreenModal", animation: "fade" }} />
-              </Stack>
-            </AuthProvider>
-          </KeyboardProvider>
-        </QueryClientProvider>
-      </GestureHandlerRootView>
-    </ErrorBoundary>
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="login" options={{ animation: 'slide_from_bottom', headerShown: false, gestureEnabled: false, headerBackVisible: false }} />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="subscription" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="visualization" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="discover-detail" options={{ animation: 'slide_from_right' }} />
+      </Stack>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  // Prewarm icon fonts so icons render on Expo Go Android.
+  const [fontsLoaded, fontError] = useFonts({
+    Ionicons: require('@react-native-vector-icons/ionicons/fonts/Ionicons.ttf'),
+    MaterialIcons: require('@react-native-vector-icons/material-icons/fonts/MaterialIcons.ttf'),
+  });
+  if (!fontsLoaded && !fontError) return <View style={{ flex: 1, backgroundColor: '#080A18' }} />;
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+    <KeyboardProvider>
+    <AlertProvider>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <SubscriptionProvider>
+              <HeraProvider>
+                <AppContent />
+              </HeraProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </ThemeProvider>
+    </AlertProvider>
+    </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

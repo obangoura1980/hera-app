@@ -48,3 +48,13 @@
 - Warm, spiritually grounded system prompt; personalized with user name + vision board goals; plain text replies
 - History: all messages stored in MongoDB (coach_messages); last 30 included as context each turn; clear button resets
 - Tested: backend 29/29, frontend chat flows pass
+
+## Update (2026-10-01) — REPLACED with the original repo code (user choice)
+- /app/frontend now runs the ORIGINAL Hera repo code (app/, components/, constants/, contexts/, hooks/, services/, template/) ported to Expo SDK 57
+- Previous Emergent-built screens archived in /app/legacy-rebuild (not routed); unused web subscription context in /app/legacy-rebuild/repo-unused
+- Port shims: template/core/emergent-client.ts (Supabase-compatible client calling FastAPI), template/auth/emergent.tsx (auth), src/utils/async-storage.ts, src/utils/av-shim.ts (expo-audio), icons -> @react-native-vector-icons/ionicons + material-icons
+- Backend: email OTP login (4-digit, Emergent managed email, from name "Hera"), /api/hera-chat (Claude claude-sonnet-5-5, original SSE protocol), /api/subscription, DELETE /api/account, /api/account/reset, PATCH /api/auth/me
+- Free trial on the paywall is a DEMO (POST /api/premium/activate); real App Store / Play Store purchases not connected
+- Data (journal, vision, chat, mood) stays on-device as in the original; cloud sync is a no-op
+- Verified: login via OTP -> paywall -> Home tab renders; backend 13/13 tests
+- Backlog: real in-app subscriptions (RevenueCat), cloud sync to backend, avatar upload to storage, Google sign-in

@@ -77,11 +77,12 @@ class User(BaseDocument):
     name: str
     password_hash: str
     is_premium: bool = False
+    avatar_path: Optional[str] = None
     created_at: datetime = Field(default_factory=now_utc)
 
     def public(self) -> dict:
-        return {"id": self.id, "email": self.email, "name": self.name,
-                "is_premium": self.is_premium, "created_at": self.created_at.isoformat()}
+        return {"id": self.id, "email": self.email, "name": self.name, "is_premium": self.is_premium,
+                "avatar_path": self.avatar_path, "created_at": self.created_at.isoformat()}
 
 
 class JournalEntry(BaseDocument):
@@ -167,6 +168,11 @@ class GenerateIn(BaseModel):
 
 class TextIn(BaseModel):
     text: str = Field(min_length=1, max_length=500)
+
+
+class ProfilePatch(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=60)
+    avatar_path: Optional[str] = None
 
 
 class SessionDoneIn(BaseModel):
@@ -291,6 +297,36 @@ async def login(data: LoginIn):
 @api.get("/auth/me")
 async def me(user: User = Depends(current_user)):
     return user.public()
+
+
+@api.patch("/auth/me")
+async def update_me(data: ProfilePatch, user: User = Depends(current_user)):
+    changes = {k: v for k, v in data.model_dump().items() if v is not None}
+    if "avatar_path" in changes and not await db.files.find_one(
+            {"storage_path": changes["avatar_path"], "user_id": user.id}):
+        raise HTTPException(400, "Unknown image")
+    if changes:
+        await db.users.update_one({"_id": ObjectId(user.id)}, {"$set": changes})
+    return User.from_mongo(await db.users.find_one({"_id": ObjectId(user.id)})).public()
+
+
+USER_COLLECTIONS = ("journal", "goals", "coach_messages", "favorites", "activities")
+
+
+@api.post("/account/reset")
+async def reset_journey(user: User = Depends(current_user)):
+    for name in USER_COLLECTIONS:
+        await db[name].delete_many({"user_id": user.id})
+    return {"ok": True}
+
+
+@api.delete("/account")
+async def delete_account(user: User = Depends(current_user)):
+    for name in USER_COLLECTIONS:
+        await db[name].delete_many({"user_id": user.id})
+    await db.files.update_many({"user_id": user.id}, {"$set": {"is_deleted": True}})
+    await db.users.delete_one({"_id": ObjectId(user.id)})
+    return {"ok": True}
 
 
 @api.post("/premium/activate")
@@ -561,6 +597,239 @@ async def session_item(session_id: str):
 async def session_complete(data: SessionDoneIn, user: User = Depends(current_user)):
     await log_activity(user.id, "session")
     return {"streak": await compute_streak(user.id)}
+
+
+# ---------------------------------------------------------------- email OTP login (Emergent managed email)
+import random
+import re as _re
+import ipaddress
+import hashlib
+import httpx
+from html import escape
+from html.parser import HTMLParser
+from urllib.parse import urlparse
+
+EMAIL_BASE_URL = "https://integrations.emergentagent.com"
+EMAIL_KEY = os.environ["EMERGENT_EMAIL_KEY"]
+EMAIL_FROM_NAME = os.environ["EMAIL_FROM_NAME"]
+EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
+
+_SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
+_CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
+             "send us your password", "enter your password below", "confirm your card number",
+             "your full card number", "seed phrase", "recovery phrase", "verify your card",
+             "social security number", "confirm your bank details")
+_HOSTISH = _re.compile(r"\b(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,})", _re.I)
+
+
+def _host_ok(host: str) -> bool:
+    if not host or "xn--" in host:
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        pass
+    return not any(host == s or host.endswith("." + s) for s in _SHORTENERS)
+
+
+def _same_site(shown: str, real: str) -> bool:
+    return shown == real or real.endswith("." + shown) or shown.endswith("." + real)
+
+
+class _EmailScan(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.tags, self.urls, self.anchors = set(), [], []
+        self._href, self._text = None, []
+
+    def handle_starttag(self, tag, attrs):
+        self.tags.add(tag.lower())
+        self.urls += [v for k, v in attrs if k.lower() in ("href", "src") and v]
+        if tag.lower() == "a":
+            self._href = dict((k.lower(), v) for k, v in attrs).get("href")
+            self._text = []
+
+    def handle_data(self, data):
+        if self._href is not None:
+            self._text.append(data)
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "a" and self._href is not None:
+            self.anchors.append((self._href, "".join(self._text)))
+            self._href, self._text = None, []
+
+
+def _assert_safe_email(subject: str, html: str) -> None:
+    scan = _EmailScan()
+    scan.feed(html)
+    if scan.tags & {"form", "input", "textarea", "select"}:
+        raise ValueError("No forms or input fields in email (G2)")
+    body = f"{subject}\n{html}".lower()
+    for p in _CRED_ASK:
+        if p in body:
+            raise ValueError(f"Email asks the recipient for credentials: {p!r} (G2)")
+    for url in scan.urls:
+        low = url.strip().lower()
+        if low.startswith(("mailto:", "tel:", "cid:", "#")):
+            continue
+        if not low.startswith("https://"):
+            raise ValueError(f"Email links/assets must be absolute https: {url!r} (G3)")
+        host = urlparse(low).hostname or ""
+        if not _host_ok(host) or urlparse(low).username is not None:
+            raise ValueError(f"Shortened, numeric-host or credential-bearing URL: {url!r} (G3)")
+    for href, text in scan.anchors:
+        real = urlparse(href.strip().lower()).hostname or ""
+        if not real:
+            continue
+        for m in _HOSTISH.finditer(text):
+            if not _same_site(m.group(1).lower(), real):
+                raise ValueError(f"Anchor text {m.group(1)!r} != real link host {real!r} (G3)")
+
+
+async def send_email(*, to: str, subject: str, html: str) -> Optional[str]:
+    _assert_safe_email(subject, html)
+    payload = {"to": [to], "subject": subject, "html": html, "from_name": EMAIL_FROM_NAME}
+    if EMAIL_REPLY_TO:
+        payload["contact_email"] = EMAIL_REPLY_TO
+    try:
+        async with httpx.AsyncClient(timeout=30) as hc:
+            resp = await hc.post(f"{EMAIL_BASE_URL}/api/v1/email/send", headers={"X-Email-Key": EMAIL_KEY}, json=payload)
+        resp.raise_for_status()
+        return resp.json().get("id")
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Email send failed: {e.response.status_code} {e.response.text}")
+        raise HTTPException(status_code=502, detail="Failed to send email")
+    except Exception as e:
+        logger.error(f"Email send error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send email")
+
+
+def _otp_html(code: str) -> str:
+    return (f'<table role="presentation" width="100%"><tr><td style="padding:32px;font-family:Arial,sans-serif;'
+            f'background:#080A18;color:#ffffff;text-align:center">'
+            f'<p style="font-size:22px;letter-spacing:6px;font-weight:bold;margin:0 0 16px">HERA</p>'
+            f'<p style="font-size:15px;color:#C084FC">Your {escape(EMAIL_FROM_NAME)} sign-in code</p>'
+            f'<p style="font-size:36px;letter-spacing:10px;font-weight:bold;color:#F472B6;margin:16px 0">{escape(code)}</p>'
+            f'<p style="font-size:13px;color:#C084FC">Enter this code in the app. It expires in 10 minutes.</p>'
+            f'<p style="font-size:12px;color:#8F7AB8;margin-top:24px">Sent by {escape(EMAIL_FROM_NAME)}. '
+            f'If you did not try to sign in, you can ignore this email.</p></td></tr></table>')
+
+
+def _hash_code(email: str, code: str) -> str:
+    return hashlib.sha256(f"{email}:{code}:{JWT_SECRET}".encode()).hexdigest()
+
+
+class OtpSendIn(BaseModel):
+    email: EmailStr
+    should_create_user: bool = True
+
+
+class OtpVerifyIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=4, max_length=8)
+
+
+@api.post("/auth/otp/send")
+async def otp_send(data: OtpSendIn):
+    email = data.email.strip().lower()
+    if not data.should_create_user and not await db.users.find_one({"email": email}):
+        raise HTTPException(404, "No account found for this email")
+    recent = await db.otps.find_one({"email": email, "created_at": {"$gt": now_utc() - timedelta(seconds=30)}})
+    if recent:
+        # The original login calls send twice (existence check + send); reuse the fresh code.
+        return {"ok": True}
+    if await db.otp_log.count_documents(
+            {"email": email, "at": {"$gt": now_utc() - timedelta(minutes=10)}}) >= 5:
+        raise HTTPException(429, "Too many codes requested. Please try again in a few minutes")
+    await db.otp_log.insert_one({"email": email, "at": now_utc()})
+    code = f"{random.SystemRandom().randint(0, 9999):04d}"
+    await db.otps.delete_many({"email": email})
+    await db.otps.insert_one({"email": email, "code_hash": _hash_code(email, code), "attempts": 0,
+                              "created_at": now_utc(), "expires_at": now_utc() + timedelta(minutes=10)})
+    await send_email(to=email, subject=f"Your {EMAIL_FROM_NAME} sign-in code: {code}", html=_otp_html(code))
+    return {"ok": True}
+
+
+@api.post("/auth/otp/verify")
+async def otp_verify(data: OtpVerifyIn):
+    email = data.email.strip().lower()
+    rec = await db.otps.find_one({"email": email})
+    if not rec or rec["expires_at"].replace(tzinfo=timezone.utc) < now_utc():
+        raise HTTPException(400, "Code expired. Please request a new one")
+    if rec["attempts"] >= 5:
+        raise HTTPException(429, "Too many attempts. Please request a new code")
+    if rec["code_hash"] != _hash_code(email, data.code.strip()):
+        await db.otps.update_one({"_id": rec["_id"]}, {"$inc": {"attempts": 1}})
+        raise HTTPException(400, "Invalid code")
+    await db.otps.delete_many({"email": email})
+    doc = await db.users.find_one({"email": email})
+    if not doc:
+        pw = bcrypt.hashpw(uuid.uuid4().hex.encode(), bcrypt.gensalt()).decode()
+        user = User(email=email, name=email.split("@")[0].title(), password_hash=pw)
+        res = await db.users.insert_one(user.to_mongo())
+        user.id = str(res.inserted_id)
+    else:
+        user = User.from_mongo(doc)
+    return {"access_token": make_token(user.id), "token_type": "bearer", "user": user.public()}
+
+
+@api.get("/subscription")
+async def subscription(user: User = Depends(current_user)):
+    return {"subscribed": user.is_premium, "is_trial": False, "plan": "yearly" if user.is_premium else "free",
+            "subscription_end": None, "product_id": None}
+
+
+# ---------------------------------------------------------------- hera-chat (original app protocol, Claude)
+class HeraChatIn(BaseModel):
+    messages: List[dict] = Field(default_factory=list)
+    userName: str = ""
+    goals: List[str] = Field(default_factory=list)
+    focusAreas: List[str] = Field(default_factory=list)
+    stream: bool = True
+    systemOverride: Optional[str] = None
+
+
+@api.post("/hera-chat")
+async def hera_chat(data: HeraChatIn, creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
+    if creds:
+        await user_from_token(creds.credentials)
+    msgs = [m for m in data.messages if isinstance(m.get("content"), str) and m.get("content").strip()][-30:]
+    if not msgs:
+        raise HTTPException(400, "No message")
+    system = data.systemOverride or (
+        COACH_PROMPT + (f"\nThe user's name is {data.userName}." if data.userName else "")
+        + (f"\nTheir goals: {', '.join(data.goals)}." if data.goals else "")
+        + (f"\nTheir focus areas: {', '.join(data.focusAreas)}." if data.focusAreas else ""))
+    history = msgs[:-1]
+    if history:
+        system += "\nConversation so far:\n" + "\n".join(
+            f"{'User' if m.get('role') == 'user' else 'Hera'}: {m['content']}" for m in history)
+    chat = new_chat(f"hera-{uuid.uuid4()}", system)
+    last = msgs[-1]["content"]
+
+    if not data.stream:
+        text = ""
+        async for ev in chat.stream_message(UserMessage(text=last)):
+            if isinstance(ev, TextDelta):
+                text += ev.content
+            elif isinstance(ev, StreamDone):
+                break
+        return {"content": text}
+
+    async def gen():
+        try:
+            async for ev in chat.stream_message(UserMessage(text=last)):
+                if isinstance(ev, TextDelta):
+                    yield f"data: {json.dumps({'choices': [{'delta': {'content': ev.content}}]})}\n\n"
+                elif isinstance(ev, StreamDone):
+                    break
+        except Exception:
+            logger.exception("hera-chat stream failed")
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 app.include_router(api)
