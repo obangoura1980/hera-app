@@ -183,3 +183,13 @@ Style: "Hand-drawn journal". Light theme only, flat (no shadows, no glass).
 
 ## 3. Recommended next step
 To restore the original brand, apply the colors from Section 1, set the app icon and splash to `/app/brand-assets/original/icon.png`, and show `logo.png` and `hera-orb.png` on the onboarding and coach screens.
+
+---
+
+## 4. Original screens reviewed in the 18 screenshots (Oct 2026)
+- **Landing:** gold logo, glowing "HERA", pink "✦ AI Manifestation Companion ✦", "tap anywhere to begin". Done.
+- **Home** (dark and light): HERA header with heart and clock buttons; orb inside a halo circle; "{name}, what do you want to *manifest?*"; message box with a send button; 🔥 trending manifestations; "For you" with "Edit desires"; cards for ✨ Daily Affirmation (Explore More), 🔮 Vision Board ("Dream Home" — 25% manifested, View Board) and 💜 Chat with Hera (Start Chat). Done.
+- **Journal:** "Your sacred space for reflection"; stats (Entries, Avg Mood, Gratitude, Wins); filters 📋 All / 🙏 Gratitude / 🌀 Reflect / 🏆 Wins; entry cards. Done (Intention filter kept as an extra).
+- **Discover:** "Expand your mind, elevate your life"; Affirmation Audio player (Manifestation · Listen, 1/16, back / play / forward); FEATURED "The Morning Manifestation Method"; tabs Manifestation / Mindset / Meditations; Lesson and Article cards. Done (the audio uses the phone's built-in voice).
+- **Settings:** profile card with avatar, streak and photo upload; Your Plan free-trial card; Cloud Sync; stats grid; 8 achievements; Appearance (Dark Mode "Ethereal deep space" / Light Mode); Daily Reminders (Morning Affirmation, Evening Reflection); Account (Hera Premium, Privacy & Data, Help & Support, Reset Journey, Delete Account); "Hera v1.0.0 • Made with love". Partly done: still missing are photo upload, reminders, privacy & data, help & support, reset journey and delete account.
+- **Paywall:** "Try Hera Free for 7 Days.", Annual $6.99/mo (Save 30%) or Monthly $9.99/mo, 10-item benefits list, gradient call-to-action button, BONUS onboarding-call card, Restore Purchases · Privacy Policy · Terms. Partly done: the bonus card and legal links aren't added yet.

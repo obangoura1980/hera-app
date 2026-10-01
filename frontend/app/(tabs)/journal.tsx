@@ -13,13 +13,14 @@ import { Chip, EmptyState, PressableScale, ScreenBg, tap } from "@/src/component
 import { useTabBottomSpace } from "@/src/navigation";
 import { makeStyles, radius, space, useTheme } from "@/src/theme";
 
-const KIND_LABEL = { gratitude: "Gratitude", intention: "Intention", reflection: "Reflection" };
+const KIND_LABEL = { gratitude: "Gratitude", intention: "Intention", reflection: "Reflection", win: "Win" };
 export const MOOD_EMOJI = ["😔", "😕", "🙂", "😊", "😁"];
 const FILTERS = [
   { k: "all", label: "📋  All" },
   { k: "gratitude", label: "🙏  Gratitude" },
   { k: "intention", label: "✨  Intention" },
   { k: "reflection", label: "🌀  Reflect" },
+  { k: "win", label: "🏆  Wins" },
 ] as const;
 
 export default function JournalTab() {
@@ -52,7 +53,9 @@ export default function JournalTab() {
       ? { bg: colors.brandTertiary, fg: colors.success }
       : k === "intention"
         ? { bg: colors.brandTertiary, fg: colors.gold }
-        : { bg: colors.brandTertiary, fg: colors.brandSecondary };
+        : k === "win"
+          ? { bg: colors.brandTertiary, fg: colors.warning }
+          : { bg: colors.brandTertiary, fg: colors.brandSecondary };
 
   return (
     <View style={styles.root} testID="journal-screen">
@@ -73,7 +76,7 @@ export default function JournalTab() {
           { v: String(entries.length), l: "Entries" },
           { v: avgMood ? MOOD_EMOJI[avgMood - 1] : "–", l: "Avg Mood" },
           { v: String(entries.filter((e) => e.kind === "gratitude").length), l: "Gratitude" },
-          { v: String(stats.data?.goals_achieved ?? 0), l: "Wins" },
+          { v: String(entries.filter((e) => e.kind === "win").length + (stats.data?.goals_achieved ?? 0)), l: "Wins" },
         ].map((s, i) => (
           <View key={s.l} style={[styles.statCell, i > 0 && styles.statDivider]}>
             <Text style={styles.statNum}>{s.v}</Text>

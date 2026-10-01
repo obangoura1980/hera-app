@@ -13,6 +13,7 @@ const KINDS = [
   { k: "gratitude", label: "Gratitude", prompt: "Today I'm grateful for…" },
   { k: "intention", label: "Intention", prompt: "I am calling in…" },
   { k: "reflection", label: "Reflection", prompt: "What I noticed today…" },
+  { k: "win", label: "Win", prompt: "Today I celebrate…" },
 ] as const;
 const MOODS = ["Heavy", "Low", "Okay", "Light", "Radiant"];
 

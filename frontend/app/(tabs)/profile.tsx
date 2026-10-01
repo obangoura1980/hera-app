@@ -188,6 +188,7 @@ export default function Profile() {
             <Text style={[styles.rowText, { color: colors.error }]}>Log out</Text>
           </Pressable>
         </View>
+        <Text style={styles.version}>Hera v1.0.0 • Made with love</Text>
       </ScrollView>
     </View>
   );
@@ -217,6 +218,7 @@ const useStyles = makeStyles((c) => ({
   achLocked: { opacity: 0.35 },
   achEmoji: { fontSize: 26 },
   achLabel: { fontSize: 11, color: c.onSurfaceSecondary, textAlign: "center", marginTop: 4 },
+  version: { fontSize: 12, color: c.muted, textAlign: "center", marginTop: space.xl },
   rowSub: { fontSize: 13, color: c.onSurfaceTertiary, marginTop: 2 },
   section: { fontSize: 14, fontWeight: "700", letterSpacing: 2.5, color: c.muted, marginTop: space.xxl, marginBottom: space.md },
   planCard: { flexDirection: "row", alignItems: "center", gap: space.md, padding: space.xl, borderRadius: 28, backgroundColor: c.surfaceSecondary, borderWidth: 1, borderColor: c.border },

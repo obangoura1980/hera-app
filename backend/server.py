@@ -86,7 +86,7 @@ class User(BaseDocument):
 
 class JournalEntry(BaseDocument):
     user_id: str
-    kind: Literal["gratitude", "intention", "reflection"] = "gratitude"
+    kind: Literal["gratitude", "intention", "reflection", "win"] = "gratitude"
     title: str = ""
     content: str
     mood: int = 3
@@ -139,7 +139,7 @@ class LoginIn(BaseModel):
 
 
 class JournalIn(BaseModel):
-    kind: Literal["gratitude", "intention", "reflection"] = "gratitude"
+    kind: Literal["gratitude", "intention", "reflection", "win"] = "gratitude"
     title: str = Field(default="", max_length=120)
     content: str = Field(min_length=1, max_length=5000)
     mood: int = Field(default=3, ge=1, le=5)
@@ -315,6 +315,11 @@ async def stats(user: User = Depends(current_user)):
 async def affirmation_today(user: User = Depends(current_user)):
     idx = (date.today().toordinal() + int(user.id[-4:], 16)) % len(AFFIRMATIONS)
     return {"text": AFFIRMATIONS[idx]}
+
+
+@api.get("/affirmations/list")
+async def affirmation_list():
+    return {"items": AFFIRMATIONS[:16]}
 
 
 @api.post("/affirmations/affirm")

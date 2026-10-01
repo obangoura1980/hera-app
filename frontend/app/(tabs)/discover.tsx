@@ -9,11 +9,12 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, type DiscoverItem } from "@/src/api";
+import { AffirmationAudio } from "@/src/components/affirmation-audio";
 import { Button, Chip, EmptyState, PressableScale, ScreenBg } from "@/src/components/ui";
 import { useTabBottomSpace } from "@/src/navigation";
 import { fonts, makeStyles, radius, space, useTheme } from "@/src/theme";
 
-const CATS = ["All", "Mindset", "Abundance", "Love", "Health", "Career"];
+const CATS = ["All", "Manifestation", "Mindset", "Meditations", "Abundance", "Love", "Career"];
 
 export default function Discover() {
   const styles = useStyles();
@@ -51,6 +52,7 @@ export default function Discover() {
           keyExtractor={(i) => i.id}
           contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.lg, paddingBottom: bottomChrome + space.xl }}
           refreshControl={<RefreshControl refreshing={q.isRefetching} onRefresh={q.refetch} tintColor={colors.brandPrimary} />}
+          ListHeaderComponent={<AffirmationAudio />}
           ListEmptyComponent={<EmptyState icon="feather" title="No new content today" body="Try another category." />}
           renderItem={({ item, index }) => (
             <Animated.View entering={FadeInDown.duration(400).delay(Math.min(index, 5) * 70)}>
@@ -88,7 +90,7 @@ export default function Discover() {
                       <View style={styles.rowBody}>
                         <View style={styles.kind}>
                           <Feather name="file-text" size={12} color={colors.brandSecondary} />
-                          <Text style={styles.kindText}>{item.category}</Text>
+                          <Text style={styles.kindText}>{item.kind ?? "Article"}</Text>
                         </View>
                         <Text style={styles.rowTitle} numberOfLines={2}>
                           {item.title}

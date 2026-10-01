@@ -114,7 +114,7 @@ export type Stats = {
 };
 export type JournalEntry = {
   id: string;
-  kind: "gratitude" | "intention" | "reflection";
+  kind: "gratitude" | "intention" | "reflection" | "win";
   title: string;
   content: string;
   mood: number;
@@ -141,6 +141,7 @@ export type Session = {
 export type DiscoverItem = {
   id: string;
   type: "article" | "quote";
+  kind?: string;
   category: string;
   title: string;
   subtitle: string;

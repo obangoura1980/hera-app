@@ -133,7 +133,7 @@ export default function Home() {
         </View>
 
         <View style={styles.trendLabel}>
-          <Feather name="trending-up" size={14} color={colors.gold} />
+          <Text style={styles.emoji}>🔥</Text>
           <Text style={styles.trendText}>TRENDING MANIFESTATIONS</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trendRow} keyboardShouldPersistTaps="handled">
@@ -155,7 +155,7 @@ export default function Home() {
         <Animated.View entering={FadeInDown.duration(500)} style={styles.cardWrap} testID="today-affirmation-card">
           <LinearGradient colors={[colors.cardGradA, colors.cardGradB]} style={styles.card}>
             <View style={styles.cardLabelRow}>
-              <Feather name="star" size={15} color={colors.warning} />
+              <Text style={styles.emoji}>✨</Text>
               <Text style={styles.cardLabel}>{aiText ? "Written for you by Hera" : "Daily Affirmation"}</Text>
               <View style={{ flex: 1 }} />
               <View style={styles.streak} testID="today-streak-badge">
@@ -183,6 +183,10 @@ export default function Home() {
                 {aiBusy ? <ActivityIndicator size="small" color={colors.brandSecondary} /> : <Feather name="refresh-cw" size={18} color={colors.brandSecondary} />}
               </PressableScale>
             </View>
+            <PressableScale testID="home-explore-more" onPress={() => router.push("/(tabs)/discover")} style={styles.explore}>
+              <Text style={styles.exploreText}>Explore More</Text>
+              <Feather name="arrow-right" size={15} color={colors.brandSecondary} />
+            </PressableScale>
             <ErrorText msg={err} testID="today-error-text" />
           </LinearGradient>
         </Animated.View>
@@ -191,7 +195,7 @@ export default function Home() {
           <PressableScale testID="home-vision-card" onPress={() => router.push("/vision")}>
             <LinearGradient colors={[colors.visionGradA, colors.visionGradB]} style={styles.card}>
               <View style={styles.cardLabelRow}>
-                <Feather name="image" size={15} color={colors.gold} />
+                <Text style={styles.emoji}>🔮</Text>
                 <Text style={styles.cardLabel}>Vision Board</Text>
               </View>
               <Text style={styles.visionTitle}>
@@ -220,7 +224,7 @@ export default function Home() {
           <PressableScale testID="home-chat-card" onPress={() => router.push("/coach")}>
             <LinearGradient colors={[colors.cardGradA, colors.cardGradB]} style={styles.card}>
               <View style={styles.cardLabelRow}>
-                <Feather name="message-circle" size={15} color={colors.brandSecondary} />
+                <Text style={styles.emoji}>💜</Text>
                 <Text style={styles.cardLabel}>Chat with Hera</Text>
               </View>
               <Text style={styles.visionTitle}>Your AI coach is ready. Share what you want to manifest today.</Text>
@@ -273,6 +277,7 @@ export default function Home() {
 const useStyles = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surface },
   fill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  emoji: { fontSize: 15 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: space.xl },
   logo: { fontSize: 26, fontWeight: "900", letterSpacing: 6, color: c.onSurface },
   headBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceSecondary, borderWidth: 1, borderColor: c.border },

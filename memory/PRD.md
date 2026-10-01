@@ -34,3 +34,11 @@
 - Floating capsule tab bar: Home, Discover, Journal, Profile; coach moved to /coach, vision board to /vision
 - Home redesigned (orb, "what do you want to manifest?" → coach, trending chips, For you cards); Journal (stats, filters, emoji moods); Discover (featured hero + row cards); Settings (stats, achievements, appearance switch, account); Premium paywall ($6.99/mo annual, $9.99/mo monthly — still MOCKED)
 - App icon / splash / adaptive icon / favicon set to Hera logo
+
+## Update (2026-10-01) — Matched to the 18 original screenshots
+- No zip was attached; used the GitHub repo plus 18 screenshots (findings in BRAND_GUIDE.md, section 4)
+- Discover: Affirmation Audio player (on-device voice via expo-speech, 16 affirmations from GET /api/affirmations/list), featured "Morning Manifestation Method", Manifestation/Mindset/Meditations tabs, Lesson/Article cards
+- Journal: Wins entry type and 🏆 Wins filter
+- Home: emoji labels (🔥 ✨ 🔮 💜), Explore More link
+- Settings: version footer
+- Backlog: daily reminders, profile photo upload, Privacy & Data / Help & Support / Reset Journey / Delete Account rows, paywall bonus card and legal links
