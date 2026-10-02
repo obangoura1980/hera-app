@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, TextInput,
-  Dimensions, Platform, KeyboardAvoidingView, Animated, Modal, Linking, Keyboard,
+  Dimensions, Platform, Animated, Modal, Linking, Keyboard,
 } from 'react-native';
 import { Audio } from '@/src/utils/av-shim';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@/src/utils/async-storage';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '@/constants/theme';
 import { useHera } from '@/hooks/useHera';
+import { KeyboardAwareScrollView, KeyboardStickyView, KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/template';
 import { getLastOnboardingScreen, setLastOnboardingScreen } from '@/src/onboarding-progress';
@@ -253,6 +254,8 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
 }) {
   const insets = useSafeAreaInsets();
   const displayed = useTypewriter(title, 20, 380);
+  // Measured so KeyboardAwareScrollView can keep focused inputs clear of the sticky footer
+  const [footerH, setFooterH] = useState(0);
   const pct = `${Math.min(100, Math.round((qNum / TOTAL_Q) * 100))}%`;
   return (
     <LinearGradient colors={['#080A18', '#0F1028', '#131838']} style={{ flex: 1, paddingTop: insets.top }}>
@@ -266,12 +269,21 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
         <Text style={ql.step}>{qNum}/{TOTAL_Q}</Text>
         {onToggleMute ? <MuteBtn isMuted={!!isMuted} onToggle={onToggleMute} /> : null}
       </View>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={ql.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <Text style={ql.title}>{displayed || ' '}</Text>
-          {children}
-        </ScrollView>
-        <View style={[ql.footer, { paddingBottom: insets.bottom + 12 }]}>
+      <KeyboardAwareScrollView
+        bottomOffset={footerH + 16}
+        contentContainerStyle={ql.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={ql.title}>{displayed || ' '}</Text>
+        {children}
+      </KeyboardAwareScrollView>
+      {/* Sticks above the keyboard instead of being hidden behind it */}
+      <KeyboardStickyView>
+        <View
+          onLayout={e => setFooterH(e.nativeEvent.layout.height)}
+          style={[ql.footer, { paddingBottom: insets.bottom + 12 }]}
+        >
           <Pressable onPress={onNext} disabled={!canNext} style={({ pressed }) => [ql.btnWrap, !canNext && { opacity: 0.32 }, pressed && { opacity: 0.8 }]}>
             <LinearGradient colors={['#A855F7', '#EC4899']} style={ql.btn}>
               <Text style={ql.btnTxt}>{nextLabel}</Text>
@@ -285,7 +297,7 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
             </Pressable>
           ) : null}
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardStickyView>
     </LinearGradient>
   );
 });
