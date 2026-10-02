@@ -675,10 +675,10 @@ function ProfileScreen() {
           <Text style={s.sectionTitle}>Your Plan</Text>
           {isSubscribed ? (
             <View style={s.subCard}>
-              <LinearGradient colors={plan === 'annual' ? ['rgba(168,85,247,0.14)', 'rgba(109,40,217,0.07)'] : [c.glassGold, 'rgba(244,114,182,0.04)']} style={s.subInner}>
+              <LinearGradient colors={plan === 'yearly' ? ['rgba(168,85,247,0.14)', 'rgba(109,40,217,0.07)'] : [c.glassGold, 'rgba(244,114,182,0.04)']} style={s.subInner}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <View style={{ flex: 1, gap: 5 }}>
-                    <View style={s.subBadge}><Text style={s.subBadgeTxt}>{isTrial ? '🔮 Free Trial' : plan === 'annual' ? '✨ Annual' : '👑 Monthly'}</Text></View>
+                    <View style={s.subBadge}><Text style={s.subBadgeTxt}>{isTrial ? '🔮 Free Trial' : plan === 'yearly' ? '✨ Annual' : '👑 Monthly'}</Text></View>
                     <Text style={s.subPlanName}>Hera {planLabel}</Text>
                     {subscriptionEnd ? <Text style={s.subPlanSub}>Renews {new Date(subscriptionEnd).toLocaleDateString()}</Text> : null}
                   </View>

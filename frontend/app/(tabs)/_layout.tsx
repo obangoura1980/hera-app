@@ -5,6 +5,7 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { useEffect } from 'react';
 import { useTheme } from '@/hooks/useTheme';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAuth } from '@/template';
 
 // ── Floating bottom nav config ─────────────────────────────────────────────────
 const NAV_ITEMS: {
@@ -20,13 +21,17 @@ const NAV_ITEMS: {
 ];
 
 // ── Subscription guard — blocks unsubscribed users from accessing tabs ─────────
+// Waits until auth and the first subscription check have resolved so paying
+// users are never bounced to the paywall while their status is still loading.
 function SubscriptionGuard() {
-  const { isSubscribed, isTrial, isLoading } = useSubscription();
+  const { isSubscribed, isTrial, isLoading, statusLoaded } = useSubscription();
+  const { loading: authLoading } = useAuth();
   useEffect(() => {
-    if (!isLoading && !isSubscribed && !isTrial) {
+    if (authLoading || isLoading || !statusLoaded) return;
+    if (!isSubscribed && !isTrial) {
       router.replace('/subscription');
     }
-  }, [isSubscribed, isTrial, isLoading]);
+  }, [isSubscribed, isTrial, isLoading, statusLoaded, authLoading]);
   return null;
 }
 

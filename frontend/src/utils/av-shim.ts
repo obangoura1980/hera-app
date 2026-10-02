@@ -19,6 +19,9 @@ class Sound {
   async setIsLoopingAsync(v: boolean) {
     this.player.loop = v;
   }
+  async getStatusAsync() {
+    return { isLoaded: true, isPlaying: this.player.playing };
+  }
   async unloadAsync() {
     this.player.remove();
   }

@@ -250,7 +250,7 @@ export default function JournalScreen() {
             <Text style={s.subtitle}>Your sacred space for reflection</Text>
           </View>
           <Pressable onPress={() => setShowModal(true)} style={{ borderRadius: Radius.full }} hitSlop={8}>
-            <LinearGradient colors={['#A855F7', '#EC4899']} style={[s.addGradient, { overflow: 'hidden', borderRadius: Radius.full }]}>
+            <LinearGradient colors={[c.primary, c.primaryDark]} style={[s.addGradient, { overflow: 'hidden', borderRadius: Radius.full }]}>
               <Ionicons name="add" size={22} color="white" />
             </LinearGradient>
           </Pressable>

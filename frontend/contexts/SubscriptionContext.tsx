@@ -63,6 +63,7 @@ interface SubscriptionContextType {
   dailyChatCount: number;
   canSendChat:    boolean;
   iapProducts:    IAPSubscription[];
+  statusLoaded:   boolean;
   // Actions
   checkSubscription:  () => Promise<void>;
   purchasePlan:       (productKey: 'monthly' | 'yearly') => Promise<void>;
@@ -93,6 +94,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [paywallFeature,  setPaywallFeature]  = useState('AI Feature');
   const [iapProducts,     setIapProducts]     = useState<IAPSubscription[]>([]);
   const [iapReady,        setIapReady]        = useState(false);
+  // True once the first subscription check has completed — guards must not
+  // redirect anyone until the real status is known.
+  const [statusLoaded,    setStatusLoaded]    = useState(false);
   const safetyTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Prevents safety timer from showing "timed out" if the purchase listener already handled it
   const purchaseHandledRef = useRef(false);
@@ -276,6 +280,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         // Silent — keep cached state
       } finally {
         setIsLoading(false);
+        setStatusLoaded(true);
       }
       return;
     }
@@ -283,6 +288,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     // Fallback for test accounts / non-mobile: check via check-subscription edge function
     if (!authUserId) {
       applyIAPStatus({ isSubscribed: false, isTrial: false, plan: 'free', expiresAt: null, validatedAt: new Date().toISOString() });
+      setStatusLoaded(true);
       return;
     }
     setIsLoading(true);
@@ -297,12 +303,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setSubscriptionEnd(data.subscription_end ?? null);
       }
     } catch {}
-    finally { setIsLoading(false); }
+    finally { setIsLoading(false); setStatusLoaded(true); }
   }, [iapReady, authUserId, applyIAPStatus]);
 
-  // Auto-check on IAP ready or auth change
+  // Auto-check on mount / IAP ready / auth change — runs on every platform;
+  // checkSubscription falls back to the server when StoreKit isn't available.
   useEffect(() => {
-    if (!iapReady && Platform.OS !== 'web') return;
     checkSubscription();
   }, [iapReady, authUserId, checkSubscription]);
 
@@ -313,11 +319,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     if (DEMO_CHECKOUT) {
       try {
         setIsPurchasing(true);
-        await api('/premium/activate', { method: 'POST' });
+        const res: any = await api('/premium/activate', { method: 'POST' });
+        if (!res?.is_premium) throw new Error('Activation was not confirmed');
+        // Reflect the activated trial immediately so the tabs guard lets the user in
+        applyIAPStatus({ isSubscribed: true, isTrial: true, plan: productKey, expiresAt: null, validatedAt: new Date().toISOString() });
         await checkSubscription();
         expoRouter.replace('/(tabs)');
       } catch {
-        showAlert('Something went wrong', 'Please sign in first, then start your free trial.');
+        showAlert('Something went wrong', 'Your trial could not be started. Please check your connection and try again — you have not been charged.');
       } finally {
         setIsPurchasing(false);
       }
@@ -478,6 +487,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       dailyChatCount,
       canSendChat,
       iapProducts,
+      statusLoaded,
       checkSubscription,
       purchasePlan,
       restoreSubscription,
