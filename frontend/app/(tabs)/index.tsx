@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Linking,
+  View, Text, StyleSheet, ScrollView, Pressable, TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, w
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth, useAlert } from '@/template';
-import { pickAvatarImage, uploadAvatar, loadAvatarUrl } from '@/services/avatarService';
+import { loadAvatarUrl } from '@/services/avatarService';
 import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 
 const TRENDING_ITEMS = [
@@ -58,13 +58,6 @@ const createStyles = (c: ThemeColors, isDark: boolean) => StyleSheet.create({
   orbInner: { position: 'relative', width: 160, height: 160, zIndex: 1, backgroundColor: 'transparent', borderWidth: 0 },
   orb: { width: 160, height: 160, backgroundColor: 'transparent' },
   orbPhoto: { width: 160, height: 160, borderRadius: 80 },
-  cameraBadge: {
-    position: 'absolute', bottom: 6, right: 2, width: 30, height: 30, borderRadius: 15,
-    backgroundColor: isDark ? '#14082E' : '#2D1520',
-    borderWidth: 2,
-    borderColor: isDark ? 'rgba(168,85,247,0.45)' : 'rgba(196,112,122,0.5)',
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   // Title section — split into two rows so the name wraps independently
   titleWrap: {
@@ -240,7 +233,6 @@ export default function HomeScreen() {
 
   const [manifestInput, setManifestInput] = useState('');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [avatarUploading, setAvatarUploading] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMsg, setToastMsg] = useState('Daily Affirmation Saved');
 
@@ -271,34 +263,6 @@ export default function HomeScreen() {
     opacity: screenOpacity.value,
     transform: [{ translateY: screenSlide.value }],
   }));
-
-  const handlePickAvatar = useCallback(async () => {
-    if (!authUser?.id) {
-      showAlert('Sign In Required', 'Please sign in to upload a custom photo.');
-      return;
-    }
-    const picked = await pickAvatarImage();
-    if (picked.status === 'cancelled') return;
-    if (picked.status === 'denied') {
-      showAlert(
-        'Photo Access Needed',
-        'Allow photo access to choose a profile picture.',
-        picked.canAskAgain
-          ? [{ text: 'OK' }]
-          : [{ text: 'Not now', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }],
-      );
-      return;
-    }
-    setAvatarUploading(true);
-    try {
-      const url = await uploadAvatar(picked.uri, picked.name, picked.type);
-      setAvatarUrl(url);
-    } catch (e: any) {
-      showAlert('Upload Failed', e.message || 'Could not upload photo. Please try again.');
-    } finally {
-      setAvatarUploading(false);
-    }
-  }, [authUser, showAlert]);
 
   const rawName = user.name.trim() || 'Beautiful Soul';
   // Cap display name at 28 chars so very long names never break the title layout
@@ -454,17 +418,6 @@ export default function HomeScreen() {
                 transition={400}
               />
             )}
-            <Pressable
-              onPress={handlePickAvatar}
-              disabled={avatarUploading}
-              style={({ pressed }) => [s.cameraBadge, pressed && { opacity: 0.7 }]}
-              hitSlop={8}
-              accessibilityLabel="Upload profile photo"
-            >
-              {avatarUploading
-                ? <ActivityIndicator size={11} color="white" />
-                : <Ionicons name="camera" size={13} color="white" />}
-            </Pressable>
           </View>
         </View>
 
