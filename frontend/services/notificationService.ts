@@ -1,6 +1,16 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { AFFIRMATIONS_BY_CATEGORY, DAILY_AFFIRMATIONS } from './heraAI';
+
+// expo-notifications throws at import time inside Expo Go on Android (SDK 53+
+// removed remote push there). Load it lazily so the whole app doesn't crash in
+// Expo Go; reminders simply report themselves unavailable until a real build.
+let Notifications: typeof import('expo-notifications') | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  Notifications = require('expo-notifications');
+} catch {
+  Notifications = null;
+}
 
 export const MORNING_NOTIF_ID = 'hera-morning-reminder';
 export const EVENING_NOTIF_ID = 'hera-evening-reminder';
@@ -26,7 +36,7 @@ const AREA_TO_CATEGORY: Record<string, string> = {
   purpose: 'career',
 };
 
-Notifications.setNotificationHandler({
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -37,23 +47,28 @@ Notifications.setNotificationHandler({
 
 /** Call once at app startup (inside useEffect). */
 export async function initNotifications(): Promise<boolean> {
+  const n = Notifications;
+  if (!n) return false;
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+    await n.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Hera Daily Reminders',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: n.AndroidImportance.DEFAULT,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#D4AF37',
     });
   }
-  const { status } = await Notifications.getPermissionsAsync();
+  const { status } = await n.getPermissionsAsync();
   return status === 'granted';
 }
 
-/** Check, then request permission. 'blocked' means the OS won't show the prompt again. */
-export async function requestNotificationPermissions(): Promise<'granted' | 'denied' | 'blocked'> {
-  let perm = await Notifications.getPermissionsAsync();
+/** Check, then request permission. 'blocked' means the OS won't show the prompt again.
+ *  'unavailable' means notifications can't run here at all (Expo Go preview). */
+export async function requestNotificationPermissions(): Promise<'granted' | 'denied' | 'blocked' | 'unavailable'> {
+  const n = Notifications;
+  if (!n) return 'unavailable';
+  let perm = await n.getPermissionsAsync();
   if (perm.granted) return 'granted';
-  if (perm.canAskAgain) perm = await Notifications.requestPermissionsAsync();
+  if (perm.canAskAgain) perm = await n.requestPermissionsAsync();
   if (perm.granted) return 'granted';
   return perm.canAskAgain ? 'denied' : 'blocked';
 }
@@ -68,11 +83,13 @@ export async function scheduleReminder(
   goals: string[],
 ): Promise<void> {
   // Always cancel the old one first
-  await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => {});
+  const n = Notifications;
+  if (!n) return;
+  await n.cancelScheduledNotificationAsync(identifier).catch(() => {});
 
   const body = pickAffirmation([...focusAreas, ...goals]);
 
-  await Notifications.scheduleNotificationAsync({
+  await n.scheduleNotificationAsync({
     identifier,
     content: {
       title,
@@ -92,7 +109,7 @@ export async function scheduleReminder(
 export async function cancelReminder(
   identifier: typeof MORNING_NOTIF_ID | typeof EVENING_NOTIF_ID,
 ): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => {});
+  await Notifications?.cancelScheduledNotificationAsync(identifier).catch(() => {});
 }
 
 /** Re-schedule ALL active reminders with fresh affirmations (call on each app open). */
@@ -102,6 +119,7 @@ export async function refreshReminders(
   focusAreas: string[],
   goals: string[],
 ): Promise<void> {
+  if (!Notifications) return;
   if (morning.enabled) {
     await scheduleReminder(MORNING_NOTIF_ID, '✨ Your Morning Affirmation', morning.hour, morning.minute, focusAreas, goals);
   }

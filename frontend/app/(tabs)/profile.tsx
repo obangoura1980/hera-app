@@ -523,6 +523,10 @@ function ProfileScreen() {
     if (value) {
       if (Platform.OS === 'web') { showAlert('Mobile Only', 'Daily reminders work in the Hera app on your phone.'); return; }
       const perm = await requestNotificationPermissions();
+      if (perm === 'unavailable') {
+        showAlert('Preview Limitation', 'Daily reminders work in the installed Hera app on your phone. They can\'t run inside the Expo Go preview.', [{ text: 'OK' }]);
+        return;
+      }
       if (perm !== 'granted') {
         showAlert(
           'Turn On Reminders',
