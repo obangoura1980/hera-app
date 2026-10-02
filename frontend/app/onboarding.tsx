@@ -7,7 +7,7 @@
  * screen reads the correct name/goals on first mount even when Context hasn't re-rendered yet.
  * Fix (transition lag): QuestionLayout wrapped in React.memo — prevents the typewriter
  * animation restarting when the parent re-renders due to unrelated TextInput state changes.
- * Fix (male option): 'Male' gender option removed; options are Female / Non-binary / Prefer not to say.
+ * Gender options: Female / Male / Non-binary / Prefer not to say.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -821,12 +821,12 @@ export default function Onboarding() {
     return (<View style={{ flex: 1 }}><QuestionLayout qNum={6} title="What is your sexuality?" onBack={goBack} onNext={goNext} canNext={true} nextLabel="Continue" onSkip={goNext} isMuted={isMuted} onToggleMute={toggleMute}><SInput value={sexuality} onChange={setSexuality} placeholder="Share however you like (optional)..." /></QuestionLayout></View>);
   }
 
-  // ── Screen 10: Gender — Male option removed per brand guidelines ───────────
+  // ── Screen 10: Gender ───────────────────────────────────────────────────────
   if (screen === 10) {
     return (
       <View style={{ flex: 1 }}>
         <QuestionLayout qNum={7} title="What's your gender?" onBack={goBack} onNext={goNext} canNext={!!gender} onSkip={goNext} isMuted={isMuted} onToggleMute={toggleMute}>
-          {['Female', 'Non-binary', 'Prefer not to say'].map(opt => (
+          {['Female', 'Male', 'Non-binary', 'Prefer not to say'].map(opt => (
             <OptionCard key={opt} label={opt} selected={gender === opt} onSelect={() => setGender(opt)} />
           ))}
         </QuestionLayout>

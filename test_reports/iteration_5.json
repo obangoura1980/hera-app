@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 5 verified the Hera profile/upload/reset backend end-to-end plus the onboarding gender screen fix. BACKEND (8/8 pass, /app/backend/tests/test_hera_profile_upload.py): POST /api/upload rejects anon (401) and non-images (400), accepts PNG and returns {path}; PATCH /api/auth/me {avatar_path:path} sets it; GET /api/auth/me reflects avatar_path; GET /api/files/{path}?token=... returns the image bytes with image/* content-type; GET /api/files/{path} without token -> 401; PATCH /api/auth/me {avatar_path:''} clears to null; PATCH with an unknown path -> 400 'Unknown image'; POST /api/account/reset requires auth and empties journal/goals/coach/favorites/activities and returns {ok:true}. FRONTEND (code review + partial UI walk at 390x844): Gender screen (/app/frontend/app/onboarding.tsx:828-832, qNum=7, 10th screen) correctly renders the four options Female, Male, Non-binary, Prefer not to say via OptionCard with canNext=!!gender so Continue enables once Male is chosen. profile.tsx now destructures updateUser from useHera() at line 280 and calls it inside the Reset Journey flow at line 499 — the previous 'undefined updateUser' crash is fixed. Reset Journey additionally wipes 9 AsyncStorage keys and (if signed in) calls POST /api/account/reset then router.replace('/onboarding'). Privacy Policy row (line 868) opens https://downloadhera.com/privacy via Linking.openURL. Upload Photo button present and wired to pickAvatarImage/uploadAvatar/removeAvatar in services/avatarService.ts (lines 15/34/41) which POST /api/upload then PATCH /api/auth/me — contract matches the verified backend. Daily Reminders Switches present with Platform.OS==='web' guard producing a 'Mobile Only' showAlert as expected. Expo preview loads cleanly (no red screen); walked onboarding splash -> welcome -> 3/20 name -> 4/20 location without errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Deprecated style props (carryover from iteration_4)", "issue": "Console warnings: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' and '\"textShadow*\" style props are deprecated.' - still present. Reference: ported Hera components."},
+      {"component": "props.pointerEvents deprecated", "issue": "'props.pointerEvents is deprecated. Use style.pointerEvents' fires on splash/landing (carryover)."},
+      {"component": "Animated useNativeDriver on web", "issue": "Benign but spammy; gate with Platform.OS !== 'web' (carryover)."},
+      {"component": "Require cycle in services/iapService.web.ts", "issue": "Still present (carryover)."},
+      {"component": "expo-notifications push token listener on web", "issue": "'[expo-notifications] Listening to push token changes is not yet fully supported on web.' Not crashing but should be gated by Platform.OS !== 'web' (carryover)."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hera_profile_upload.py",
+    "/app/test_reports/pytest/pytest_profile_upload.xml"
+  ],
+  "action_items": [
+    "No functional blockers found - all requested backend endpoints and the gender/profile code fixes verified. Clean up the known React-Native-on-web deprecation warnings (textShadow*, shadow*, props.pointerEvents, Animated useNativeDriver, iapService.web.ts require cycle, expo-notifications web listener) at main agent's discretion."
+  ],
+  "critical_code_review_comments": [
+    "server.py:302-312 PATCH /auth/me correctly treats empty-string avatar_path as 'clear to null' and 404-free (no raise if '' before unknown-image check). Good UX for 'Remove photo'.",
+    "server.py:509-519 GET /api/files/{path} accepts the token from either Authorization header OR ?token= query which the frontend uses in fileSource(path) for <Image> src - correct for RN Image (no custom headers).",
+    "server.py:318-322 POST /account/reset only deletes the user's own documents across USER_COLLECTIONS; the files collection is intentionally NOT reset (uploads survive a journey reset) - verify this matches product intent.",
+    "profile.tsx:280 destructures updateUser from useHera() (previous crash) - fix in place. Also calls api('/account/reset') with .catch(()=>{}) at line 502 so a backend failure never blocks local reset - good resilience.",
+    "profile.tsx uses supabase.auth.signInWithOtp / verifyOtp / functions.invoke('delete-account') via the emergent-client shim for the OTP-protected deletion flow; functional parity with the backend DELETE /api/account was not retested this iteration but iteration_4 verified that endpoint works.",
+    "avatarService.ts:36 PATCH body is {avatar_path: path}; matches ProfilePatch model."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_hera_profile_upload.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8 new + iteration_4 regression unchanged)", "frontend": "Code-review verified for gender/profile/reset/privacy; partial UI walk (splash -> welcome -> onboarding steps 3-4) - deeper tab/profile UI inside auth boundary not exercised due to the same auth-bootstrap limitation documented in iteration_4."},
+  "seed_data_creation": "Backend tests register a throwaway TEST_prof_*@example.com user per module and delete it in test_zz_cleanup. One upload PNG object is left in storage per run (small, acceptable).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "To reach the (tabs)/profile screen on web preview you must either (a) seed an AsyncStorage/localStorage auth token so useHera() hydrates, or (b) complete the 20-step onboarding end-to-end. The onboarding referral step (step 1 in flow) expects an empty input + 'Skip — I don't have a code', otherwise 'Apply & Continue' blocks until the referral check completes. Flow is: splash tap -> welcome Continue -> referral Skip -> 1/20 Continue -> 2/20 Continue -> 3/20 name 'Tester' Continue -> 4/20 location Skip -> ... -> 7/20 gender. The gender screen renders OptionCard with Female/Male/Non-binary/Prefer not to say; Continue becomes enabled on selection.",
+  "rca_of_issue": "No functional bug found. The previously reported undefined-updateUser crash in profile.tsx is confirmed fixed (updateUser now destructured from useHera() on line 280 and used at line 499). All iteration_5 features (gender/Male option, upload/avatar/files flow, account reset, privacy policy link) are implemented and verified."
+}

@@ -16,8 +16,9 @@ import {
   pickAvatarImage,
   uploadAvatar,
   removeAvatar,
-  loadCachedAvatarUrl,
+  loadAvatarUrl,
 } from '@/services/avatarService';
+import { api } from '@/src/api';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth, useAlert } from '@/template';
@@ -276,7 +277,7 @@ function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c, isDark, toggleTheme } = useTheme();
   const s = useMemo(() => createStyles(c), [c]);
-  const { user, journalEntries, visionItems, favoriteAffirmations, notifMorning, notifEvening, updateNotifMorning, updateNotifEvening, syncStatus, lastSyncedAt, syncNow, isAuthenticated } = useHera();
+  const { user, updateUser, journalEntries, visionItems, favoriteAffirmations, notifMorning, notifEvening, updateNotifMorning, updateNotifEvening, syncStatus, lastSyncedAt, syncNow, isAuthenticated } = useHera();
   const { user: authUser, logout } = useAuth();
   const { showAlert } = useAlert();
   const { isSubscribed, isTrial, plan, planLabel, subscriptionEnd, openPortal } = useSubscription();
@@ -299,22 +300,33 @@ function ProfileScreen() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
 
-  // Load cached avatar on mount
+  // Load saved avatar from the profile
   useEffect(() => {
-    loadCachedAvatarUrl().then(url => { if (url) setAvatarUrl(url); }).catch(() => {});
-  }, []);
+    if (!authUser?.id) return;
+    loadAvatarUrl().then(setAvatarUrl).catch(() => {});
+  }, [authUser?.id]);
 
   const handlePickAvatar = useCallback(async () => {
     if (!authUser?.id) {
       showAlert('Sign In Required', 'Please sign in to upload a custom avatar.');
       return;
     }
-    const localUri = await pickAvatarImage();
-    if (!localUri) return;
+    const picked = await pickAvatarImage();
+    if (picked.status === 'cancelled') return;
+    if (picked.status === 'denied') {
+      showAlert(
+        'Photo Access Needed',
+        'Allow photo access to choose a profile picture.',
+        picked.canAskAgain
+          ? [{ text: 'OK' }]
+          : [{ text: 'Not now', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }],
+      );
+      return;
+    }
     setAvatarUploading(true);
     try {
-      const publicUrl = await uploadAvatar(localUri, authUser.id);
-      setAvatarUrl(publicUrl);
+      const url = await uploadAvatar(picked.uri, picked.name, picked.type);
+      setAvatarUrl(url);
     } catch (e: any) {
       showAlert('Upload Failed', e.message || 'Could not upload photo. Please try again.');
     } finally {
@@ -327,8 +339,12 @@ function ProfileScreen() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove', style: 'destructive', onPress: async () => {
-          if (authUser?.id) await removeAvatar(authUser.id).catch(() => {});
-          setAvatarUrl(null);
+          try {
+            await removeAvatar();
+            setAvatarUrl(null);
+          } catch (e: any) {
+            showAlert('Error', e.message || 'Could not remove photo.');
+          }
         },
       },
     ]);
@@ -483,21 +499,7 @@ function ProfileScreen() {
             updateUser({ name: '', goals: [], focusAreas: [], onboardingComplete: false, streak: 1 });
 
             // 3. If signed in, wipe backend records too
-            if (isAuthenticated) {
-              try {
-                const { getSupabaseClient } = await import('@/template');
-                const supabase = getSupabaseClient();
-                const { data: { user: authU } } = await supabase.auth.getUser();
-                if (authU?.id) {
-                  await Promise.allSettled([
-                    supabase.from('hera_user_data').delete().eq('user_id', authU.id),
-                    supabase.from('hera_journal_entries').delete().eq('user_id', authU.id),
-                    supabase.from('hera_vision_items').delete().eq('user_id', authU.id),
-                    supabase.from('hera_chat_messages').delete().eq('user_id', authU.id),
-                  ]);
-                }
-              } catch {}
-            }
+            if (authUser?.id) await api('/account/reset', { method: 'POST' }).catch(() => {});
           } catch {}
 
           // 4. Navigate to onboarding
@@ -516,8 +518,18 @@ function ProfileScreen() {
 
   const handleToggle = useCallback(async (type: PickerType, value: boolean) => {
     if (value) {
-      const granted = await requestNotificationPermissions();
-      if (!granted) { showAlert('Permission Required', 'Please enable notifications in your device settings.', [{ text: 'OK' }]); return; }
+      if (Platform.OS === 'web') { showAlert('Mobile Only', 'Daily reminders work in the Hera app on your phone.'); return; }
+      const perm = await requestNotificationPermissions();
+      if (perm !== 'granted') {
+        showAlert(
+          'Turn On Reminders',
+          'Allow notifications so Hera can send your daily affirmation.',
+          perm === 'blocked'
+            ? [{ text: 'Not now', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }]
+            : [{ text: 'OK' }],
+        );
+        return;
+      }
       setPickerType(type); setPickerVisible(true);
     } else {
       if (type === 'morning') await updateNotifMorning({ ...notifMorning, enabled: false });
@@ -853,7 +865,7 @@ function ProfileScreen() {
               <Ionicons name="open-outline" size={15} color={c.textSubtle} />
             </Pressable>
             <Pressable
-              onPress={() => {/* TODO: add your privacy policy URL */}}
+              onPress={() => Linking.openURL('https://downloadhera.com/privacy')}
               style={({ pressed }) => [s.settingRow, pressed && { opacity: 0.75 }]}
             >
               <View style={s.settingLeft}>

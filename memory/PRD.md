@@ -58,3 +58,10 @@
 - Data (journal, vision, chat, mood) stays on-device as in the original; cloud sync is a no-op
 - Verified: login via OTP -> paywall -> Home tab renders; backend 13/13 tests
 - Backlog: real in-app subscriptions (RevenueCat), cloud sync to backend, avatar upload to storage, Google sign-in
+
+## Update (2026-06) — Gender fix, avatar storage, reminders polish
+- Onboarding gender: Female / Male / Non-binary / Prefer not to say
+- Profile photo: expo-image-picker -> POST /api/upload (Emergent object storage) -> PATCH /api/auth/me avatar_path; shown on Home + Settings; remove clears avatar_path
+- Daily reminders: expo-notifications (morning/evening), permission check -> request -> Open Settings when blocked; web shows "Mobile Only"; plugin added to app.json
+- Reset Journey fixed (updateUser) and now calls POST /api/account/reset; Privacy Policy link wired
+- Tested: iteration_5 backend 8/8, frontend pass

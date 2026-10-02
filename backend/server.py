@@ -302,7 +302,9 @@ async def me(user: User = Depends(current_user)):
 @api.patch("/auth/me")
 async def update_me(data: ProfilePatch, user: User = Depends(current_user)):
     changes = {k: v for k, v in data.model_dump().items() if v is not None}
-    if "avatar_path" in changes and not await db.files.find_one(
+    if changes.get("avatar_path") == "":
+        changes["avatar_path"] = None
+    elif "avatar_path" in changes and not await db.files.find_one(
             {"storage_path": changes["avatar_path"], "user_id": user.id}):
         raise HTTPException(400, "Unknown image")
     if changes:

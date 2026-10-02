@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, Linking,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,7 +11,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, w
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth, useAlert } from '@/template';
-import { pickAvatarImage, uploadAvatar, loadCachedAvatarUrl } from '@/services/avatarService';
+import { pickAvatarImage, uploadAvatar, loadAvatarUrl } from '@/services/avatarService';
 import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 
 const TRENDING_ITEMS = [
@@ -252,11 +252,6 @@ export default function HomeScreen() {
 
   const s = useMemo(() => createStyles(c, isDark), [c, isDark]);
 
-  // Load cached avatar on mount
-  useEffect(() => {
-    loadCachedAvatarUrl().then(url => { if (url) setAvatarUrl(url); }).catch(() => {});
-  }, []);
-
   const screenOpacity = useSharedValue(0);
   const screenSlide = useSharedValue(10);
 
@@ -267,8 +262,9 @@ export default function HomeScreen() {
       screenSlide.value = 10;
       screenOpacity.value = withTiming(1, { duration: 280 });
       screenSlide.value = withTiming(0, { duration: 280 });
-      loadCachedAvatarUrl().then(url => setAvatarUrl(url ?? null)).catch(() => {});
-    }, [])
+      if (authUser?.id) loadAvatarUrl().then(setAvatarUrl).catch(() => {});
+      else setAvatarUrl(null);
+    }, [authUser?.id])
   );
 
   const screenAnimStyle = useAnimatedStyle(() => ({
@@ -281,12 +277,22 @@ export default function HomeScreen() {
       showAlert('Sign In Required', 'Please sign in to upload a custom photo.');
       return;
     }
-    const localUri = await pickAvatarImage();
-    if (!localUri) return;
+    const picked = await pickAvatarImage();
+    if (picked.status === 'cancelled') return;
+    if (picked.status === 'denied') {
+      showAlert(
+        'Photo Access Needed',
+        'Allow photo access to choose a profile picture.',
+        picked.canAskAgain
+          ? [{ text: 'OK' }]
+          : [{ text: 'Not now', style: 'cancel' }, { text: 'Open Settings', onPress: () => Linking.openSettings() }],
+      );
+      return;
+    }
     setAvatarUploading(true);
     try {
-      const publicUrl = await uploadAvatar(localUri, authUser.id);
-      setAvatarUrl(publicUrl);
+      const url = await uploadAvatar(picked.uri, picked.name, picked.type);
+      setAvatarUrl(url);
     } catch (e: any) {
       showAlert('Upload Failed', e.message || 'Could not upload photo. Please try again.');
     } finally {

@@ -28,7 +28,8 @@ const AREA_TO_CATEGORY: Record<string, string> = {
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -48,12 +49,13 @@ export async function initNotifications(): Promise<boolean> {
   return status === 'granted';
 }
 
-/** Request permissions from the user. Returns true if granted. */
-export async function requestNotificationPermissions(): Promise<boolean> {
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === 'granted') return true;
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status === 'granted';
+/** Check, then request permission. 'blocked' means the OS won't show the prompt again. */
+export async function requestNotificationPermissions(): Promise<'granted' | 'denied' | 'blocked'> {
+  let perm = await Notifications.getPermissionsAsync();
+  if (perm.granted) return 'granted';
+  if (perm.canAskAgain) perm = await Notifications.requestPermissionsAsync();
+  if (perm.granted) return 'granted';
+  return perm.canAskAgain ? 'denied' : 'blocked';
 }
 
 /** Schedule (or reschedule) a daily affirmation reminder. */

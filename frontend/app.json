@@ -11,7 +11,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.manifestdreams.qc3zvj",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Pin photos of your dreams to your vision board"
+        "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board"
       }
     },
     "android": {
@@ -46,12 +46,18 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Pin photos of your dreams to your vision board",
+          "photosPermission": "Choose photos for your profile and vision board",
           "cameraPermission": false,
           "microphonePermission": false
         }
       ],
       "expo-audio",
+      [
+        "expo-notifications",
+        {
+          "color": "#A855F7"
+        }
+      ],
       "@react-native-vector-icons/ionicons",
       "@react-native-vector-icons/material-icons"
     ],
