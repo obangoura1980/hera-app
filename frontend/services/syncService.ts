@@ -287,6 +287,7 @@ export async function pullUserData(): Promise<SyncResult<Partial<HeraUser>>> {
       if (error.code === 'PGRST116') return { data: {}, error: null }; // No row = first sync
       return { data: null, error: error.message };
     }
+    if (!data) return { data: {}, error: null }; // shim: .single() resolves null when no row exists
 
     return {
       data: {

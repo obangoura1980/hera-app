@@ -152,8 +152,8 @@ const createStyles = (c: ThemeColors) => StyleSheet.create({
   profileName:     { fontSize: FontSize.xl, color: c.textWhite, fontWeight: '700', textAlign: 'center', flexShrink: 1, maxWidth: '85%' },
   streakBadge:     { backgroundColor: c.glassGold, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.full, borderWidth: 1, borderColor: c.borderGold },
   streakText:      { fontSize: FontSize.sm, color: c.gold, fontWeight: '600' },
-  goalsRow:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm },
-  goalBadge:       { backgroundColor: c.glassPurple, paddingHorizontal: Spacing.md, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, borderColor: c.border, maxWidth: '48%' },
+  goalsRow:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm, alignSelf: 'stretch' },
+  goalBadge:       { backgroundColor: c.glassPurple, paddingHorizontal: Spacing.md, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, borderColor: c.border, maxWidth: '48%', flexDirection: 'row', alignItems: 'flex-end' },
   goalBadgeText:   { fontSize: FontSize.xs, color: c.primaryLight, fontWeight: '600', textTransform: 'capitalize', flexShrink: 1 },
   statsGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   statCard:        { flex: 1, minWidth: '45%', backgroundColor: c.card, borderRadius: Radius.lg, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: c.border, gap: 4 },
@@ -354,6 +354,7 @@ function ProfileScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<PickerType>('morning');
   const [privacyVisible, setPrivacyVisible] = useState(false);
+  const [goalDetail, setGoalDetail] = useState<string | null>(null);
   const [helpVisible, setHelpVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -633,10 +634,41 @@ function ProfileScreen() {
           )}
           {safeGoals.length > 0 && (
             <View style={s.goalsRow}>
-              {safeGoals.slice(0, 4).map((g, i) => <View key={i} style={s.goalBadge}><Text style={s.goalBadgeText} numberOfLines={1}>{g}</Text></View>)}
+              {safeGoals.slice(0, 4).map((g, i) => (
+                <Pressable key={i} style={s.goalBadge} onPress={() => setGoalDetail(g)} accessibilityLabel={`Goal: ${g}. Tap to read in full`}>
+                  <Text style={s.goalBadgeText} numberOfLines={1}>{g}</Text>
+                  {g.length > 42 ? <Text style={{ fontSize: 9, color: c.textSubtle, fontWeight: '700', flexShrink: 0 }} numberOfLines={1}> See more</Text> : null}
+                </Pressable>
+              ))}
             </View>
           )}
         </LinearGradient>
+
+        {/* Goal detail — full text in a translucent container */}
+        <Modal visible={!!goalDetail} transparent animationType="fade" onRequestClose={() => setGoalDetail(null)}>
+          <Pressable
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: Spacing.xl }}
+            onPress={() => setGoalDetail(null)}
+          >
+            <Pressable
+              onPress={e => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: 420, borderRadius: Radius.xl, borderWidth: 1, borderColor: c.border,
+                backgroundColor: isDark ? 'rgba(18,20,42,0.82)' : 'rgba(255,255,255,0.88)',
+                padding: Spacing.lg, gap: Spacing.md,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="sparkles" size={14} color={c.primaryLight} />
+                <Text style={{ fontSize: FontSize.sm, color: c.primaryLight, fontWeight: '700' }}>What you're manifesting</Text>
+              </View>
+              <Text style={{ fontSize: FontSize.base, color: c.textWhite, lineHeight: 22 }}>{goalDetail}</Text>
+              <Pressable onPress={() => setGoalDetail(null)} hitSlop={8} style={{ alignSelf: 'flex-end' }}>
+                <Text style={{ fontSize: FontSize.xs, color: c.textSubtle, fontWeight: '600' }}>Close</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {/* Subscription */}
         <View style={s.section}>
