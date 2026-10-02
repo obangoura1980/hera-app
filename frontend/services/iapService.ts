@@ -1,11 +1,8 @@
 /**
- * iapService.ts — Web / non-native stub
- * Metro resolves platform-specific extensions first:
- *   iOS / Android  →  iapService.native.ts  (real StoreKit implementation)
- *   Web            →  iapService.ts          (this no-op stub)
- *
- * IMPORTANT: This file must NEVER import react-native-iap — it causes web build failures.
- * All exports mirror the native file so imports compile on every platform.
+ * iapService.ts — Cross-platform stub (no react-native-iap).
+ * Used on every platform while DEMO_CHECKOUT routes the free trial through the
+ * backend (POST /api/premium/activate). All exports mirror the future native
+ * implementation so consumers compile unchanged.
  */
 import AsyncStorage from '@/src/utils/async-storage';
 import { getSupabaseClient } from '@/template';

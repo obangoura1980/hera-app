@@ -263,7 +263,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
               applyIAPStatus({
                 isSubscribed: true,
                 isTrial: data.is_trial ?? false,
-                plan: data.plan === 'annual' ? 'yearly' : 'monthly',
+                plan: data.plan === 'annual' || data.plan === 'yearly' ? 'yearly' : 'monthly',
                 expiresAt: data.subscription_end ?? null,
                 validatedAt: new Date().toISOString(),
               });
@@ -293,7 +293,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       if (data?.subscribed) {
         setIsSubscribed(true);
         setIsTrial(data.is_trial ?? false);
-        setPlan(data.plan === 'annual' ? 'yearly' : 'monthly');
+        setPlan(data.plan === 'annual' || data.plan === 'yearly' ? 'yearly' : 'monthly');
         setSubscriptionEnd(data.subscription_end ?? null);
       }
     } catch {}
@@ -414,7 +414,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           applyIAPStatus({
             isSubscribed: true,
             isTrial: data.is_trial ?? false,
-            plan: data.plan === 'annual' ? 'yearly' : 'monthly',
+            plan: data.plan === 'annual' || data.plan === 'yearly' ? 'yearly' : 'monthly',
             expiresAt: data.subscription_end ?? null,
             validatedAt: new Date().toISOString(),
           });
