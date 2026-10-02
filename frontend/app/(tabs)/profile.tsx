@@ -27,6 +27,7 @@ import { requestNotificationPermissions, formatTime } from '@/services/notificat
 import { ActivityIndicator } from 'react-native';
 import { NotifSetting } from '@/contexts/HeraContext';
 import type { SyncStatus } from '@/services/syncService';
+import { resetOnboardingProgress } from '@/src/onboarding-progress';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 interface EBState { hasError: boolean; }
@@ -468,6 +469,7 @@ function ProfileScreen() {
     if (deleteStep !== 'success') return;
     const timer = setTimeout(async () => {
       await AsyncStorage.clear().catch(() => {});
+      resetOnboardingProgress();
       try { await logout(); } catch {}
       setDeleteVisible(false);
       router.replace('/onboarding');
@@ -500,6 +502,7 @@ function ProfileScreen() {
 
             // 3. If signed in, wipe backend records too
             if (authUser?.id) await api('/account/reset', { method: 'POST' }).catch(() => {});
+            resetOnboardingProgress();
           } catch {}
 
           // 4. Navigate to onboarding

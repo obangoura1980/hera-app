@@ -12,6 +12,7 @@ import { useAuth, getSupabaseClient } from '@/template';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { pullAllData } from '@/services/syncService';
+import { resetOnboardingProgress } from '@/src/onboarding-progress';
 import { Image } from 'expo-image';
 import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 
@@ -284,7 +285,7 @@ export default function LoginScreen() {
           showAlert(
             'Account Not Found',
             'No account exists for this email address. You will be taken to onboarding to create your profile.',
-            [{ text: 'OK', onPress: () => router.replace('/onboarding') }]
+            [{ text: 'OK', onPress: () => { resetOnboardingProgress(); router.replace('/onboarding'); }}]
           );
           return;
         }
@@ -487,7 +488,7 @@ export default function LoginScreen() {
               showAlert(
                 "Can't Restore Journey",
                 'No account or saved journey found. Please start fresh or log in with your email.',
-                [{ text: 'Start Fresh', onPress: () => { try { router.replace('/onboarding'); } catch {} } }]
+                [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} } }]
               );
               return;
             }
@@ -512,7 +513,7 @@ export default function LoginScreen() {
               showAlert(
                 "Can't Restore Journey",
                 "We couldn't find your saved progress in the cloud. Starting fresh instead.",
-                [{ text: 'Start Fresh', onPress: () => { try { router.replace('/onboarding'); } catch {} } }]
+                [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} } }]
               );
               return;
             }
@@ -527,7 +528,7 @@ export default function LoginScreen() {
             showAlert(
               "Can't Restore Journey",
               'Something went wrong while restoring your journey. Please start fresh.',
-              [{ text: 'Start Fresh', onPress: () => { try { router.replace('/onboarding'); } catch {} } }]
+              [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} } }]
             );
           }
         }}
@@ -538,7 +539,7 @@ export default function LoginScreen() {
           } catch (e) {
             console.warn('[Login] Start fresh failed:', e);
           } finally {
-            try { router.replace('/subscription'); } catch { try { router.replace('/onboarding'); } catch {} }
+            try { router.replace('/subscription'); } catch { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} }
           }
         }}
       />

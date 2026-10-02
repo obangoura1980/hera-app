@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth, useAlert } from '@/template';
@@ -511,6 +511,7 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
   const { isDark, colors: c } = useTheme();
   const { sendOTP, verifyOTPAndLogin, operationLoading } = useAuth();
   const { showAlert } = useAlert();
+  const { from } = useLocalSearchParams<{ from?: string }>();
 
   const [authStage, setAuthStage] = useState<AuthStage>('email');
   const [email, setEmail]         = useState('');
@@ -568,6 +569,7 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
           <Pressable
             onPress={() => {
               if (authStage === 'otp') { setAuthStage('email'); setOtp(''); }
+              else if (from === 'onboarding') router.replace('/onboarding'); // resume at the paywall, not page 1
               else if (router.canGoBack()) router.back();
             }}
             style={({ pressed }) => [ag.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', borderColor: cardBorder }, pressed && { opacity: 0.65 }]}

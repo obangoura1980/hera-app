@@ -25,6 +25,7 @@ import { Colors, Spacing, Radius, FontSize, Shadow } from '@/constants/theme';
 import { useHera } from '@/hooks/useHera';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/template';
+import { getLastOnboardingScreen, setLastOnboardingScreen } from '@/src/onboarding-progress';
 
 const { width } = Dimensions.get('window');
 
@@ -533,8 +534,7 @@ const PLANS = [
   { id: 'founding' as const, label: 'Founding Member', price: '$7.99', period: '/ month', monthly: null, badge: 'Limited', highlight: false },
 ];
 
-// Module-level so navigating away (e.g. to /login) and pressing back resumes the same step
-let lastOnboardingScreen = 1;
+// Resume position is tracked in @/src/onboarding-progress
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
@@ -548,12 +548,12 @@ export default function Onboarding() {
   const fadeInInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeOutInterval= useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [screen, setScreenState] = useState(lastOnboardingScreen);
+  const [screen, setScreenState] = useState(getLastOnboardingScreen());
   // Wrap setScreen so the current step survives navigating away (e.g. to /login) and back
   const setScreen = useCallback((v: number | ((s: number) => number)) => {
     setScreenState(prev => {
       const next = typeof v === 'function' ? v(prev) : v;
-      lastOnboardingScreen = next;
+      setLastOnboardingScreen(next);
       return next;
     });
   }, []);
@@ -683,7 +683,6 @@ export default function Onboarding() {
   // reads the correct name/goals on first mount even before Context re-renders.
   const persistAndNavigate = useCallback(async (dest: '/(tabs)' | '/subscription') => {
     try { stopAudioNow(); } catch {}
-    lastOnboardingScreen = 1; // fresh run next time onboarding is entered
     const userName   = name.trim() || 'Beautiful Soul';
     const goalsArr   = goals.trim() ? [goals.trim()] : [];
     const userRecord = { name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, streak: 1 };
@@ -692,7 +691,14 @@ export default function Onboarding() {
       AsyncStorage.setItem('hera_onboarded', 'true'),
     ]).catch(() => {});
     updateUser({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true });
-    router.replace(dest);
+    if (dest === '/subscription') {
+      // Back from the sign-in gate should return to the paywall, not restart onboarding
+      setLastOnboardingScreen(25);
+      router.replace({ pathname: '/subscription', params: { from: 'onboarding' } });
+    } else {
+      setLastOnboardingScreen(1);
+      router.replace(dest);
+    }
   }, [name, goals, updateUser, stopAudioNow]);
 
   const finishOnboarding = useCallback(() => persistAndNavigate('/(tabs)'),    [persistAndNavigate]);
