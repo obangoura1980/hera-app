@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { initNotifications } from '@/services/notificationService';
 import { useFonts } from 'expo-font';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { OfflineNotice } from '@/components/OfflineNotice';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 function AppContent() {
@@ -41,6 +42,7 @@ function AppContent() {
         <Stack.Screen name="visualization" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="discover-detail" options={{ animation: 'slide_from_right' }} />
       </Stack>
+      <OfflineNotice />
     </>
   );
 }

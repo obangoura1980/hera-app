@@ -708,14 +708,33 @@ async def send_email(*, to: str, subject: str, html: str) -> Optional[str]:
 
 
 def _otp_html(code: str) -> str:
-    return (f'<table role="presentation" width="100%"><tr><td style="padding:32px;font-family:Arial,sans-serif;'
-            f'background:#080A18;color:#ffffff;text-align:center">'
-            f'<p style="font-size:22px;letter-spacing:6px;font-weight:bold;margin:0 0 16px">HERA</p>'
-            f'<p style="font-size:15px;color:#C084FC">Your {escape(EMAIL_FROM_NAME)} sign-in code</p>'
-            f'<p style="font-size:36px;letter-spacing:10px;font-weight:bold;color:#F472B6;margin:16px 0">{escape(code)}</p>'
-            f'<p style="font-size:13px;color:#C084FC">Enter this code in the app. It expires in 10 minutes.</p>'
-            f'<p style="font-size:12px;color:#8F7AB8;margin-top:24px">Sent by {escape(EMAIL_FROM_NAME)}. '
-            f'If you did not try to sign in, you can ignore this email.</p></td></tr></table>')
+    from_name = escape(EMAIL_FROM_NAME)
+    return (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#080A18">'
+        '<tr><td align="center" style="padding:40px 16px">'
+        '<table role="presentation" width="480" cellpadding="0" cellspacing="0" '
+        'style="max-width:480px;width:100%;background:#0F1028;border:1px solid #262A4D;border-radius:20px">'
+        '<tr><td align="center" style="padding:36px 32px 6px">'
+        '<p style="margin:0;font-family:Georgia,serif;font-size:30px;letter-spacing:14px;font-weight:bold;color:#FFFFFF">HERA</p>'
+        '<p style="margin:10px 0 0;font-family:Arial,sans-serif;font-size:11px;letter-spacing:3px;color:#F4D35E">AI MANIFESTATION COMPANION</p>'
+        '</td></tr>'
+        '<tr><td align="center" style="padding:20px 32px 0"><div style="width:64px;height:2px;background:#A855F7"></div></td></tr>'
+        '<tr><td align="center" style="padding:26px 32px 0;font-family:Arial,sans-serif">'
+        '<p style="margin:0;font-size:16px;line-height:24px;color:#D8CFF0">Beautiful soul, your journey continues.</p>'
+        f'<p style="margin:12px 0 0;font-size:13px;line-height:20px;color:#9D94C7">Use this code to sign in to {from_name}. It expires in 10 minutes.</p>'
+        '</td></tr>'
+        '<tr><td align="center" style="padding:28px 32px 30px">'
+        '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
+        f'<td style="background:#A855F7;border-radius:14px;padding:18px 42px;font-family:Arial,sans-serif;'
+        f'font-size:34px;letter-spacing:12px;font-weight:bold;color:#FFFFFF;text-align:center">{escape(code)}</td>'
+        '</tr></table>'
+        '</td></tr>'
+        '<tr><td align="center" style="padding:0 32px 32px;font-family:Arial,sans-serif">'
+        f'<p style="margin:0;font-size:11px;line-height:18px;color:#6E6394">Sent by {from_name} · '
+        'If you did not try to sign in, you can ignore this email.</p>'
+        '</td></tr>'
+        '</table></td></tr></table>'
+    )
 
 
 def _hash_code(email: str, code: str) -> str:
@@ -749,7 +768,12 @@ async def otp_send(data: OtpSendIn):
     await db.otps.delete_many({"email": email})
     await db.otps.insert_one({"email": email, "code_hash": _hash_code(email, code), "attempts": 0,
                               "created_at": now_utc(), "expires_at": now_utc() + timedelta(minutes=10)})
-    await send_email(to=email, subject=f"Your {EMAIL_FROM_NAME} sign-in code: {code}", html=_otp_html(code))
+    try:
+        await send_email(to=email, subject=f"Your {EMAIL_FROM_NAME} sign-in code: {code}", html=_otp_html(code))
+    except Exception:
+        # Don't leave a code the user never received (they'd be blocked by the 30s resend reuse)
+        await db.otps.delete_many({"email": email})
+        raise
     return {"ok": True}
 
 

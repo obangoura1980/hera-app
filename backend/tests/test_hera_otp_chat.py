@@ -50,14 +50,21 @@ class TestOtpSend:
                           json={"email": email, "should_create_user": False})
         assert r.status_code == 404, r.text
 
-    def test_send_rate_limited_within_30s(self):
+    def test_resend_within_30s_reuses_code(self):
+        # Behavior changed (iter 14): a second send within 30s reuses the fresh
+        # code and returns ok instead of 429 (original login calls send twice).
         email = f"TEST_otp_{uuid.uuid4().hex[:8]}@hera.app"
         r1 = requests.post(f"{API}/auth/otp/send",
                            json={"email": email, "should_create_user": True})
+        if r1.status_code == 502:
+            pytest.skip("email provider unavailable/rate-limited (502 from send_email)")
         assert r1.status_code == 200, r1.text
         r2 = requests.post(f"{API}/auth/otp/send",
                            json={"email": email, "should_create_user": True})
-        assert r2.status_code == 429, r2.text
+        assert r2.status_code == 200, r2.text
+        assert r2.json().get("ok") is True
+        recs = list(db.otps.find({"email": email.lower()}))
+        assert len(recs) == 1  # code reused, not regenerated
 
 
 class TestOtpVerify:
