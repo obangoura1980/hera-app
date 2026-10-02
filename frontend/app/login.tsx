@@ -353,6 +353,20 @@ export default function LoginScreen() {
       <LinearGradient colors={bgColors} style={StyleSheet.absoluteFill} />
       <View style={{ position: 'absolute', top: -80, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: glowBg }} />
 
+      {/* Back control — /login is a gesture-disabled modal, so an explicit way back is required */}
+      <Pressable
+        onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/onboarding'); }}
+        hitSlop={12}
+        accessibilityLabel="Go back"
+        style={({ pressed }) => [{
+          position: 'absolute', top: insets.top + 12, left: Spacing.lg, zIndex: 10,
+          width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+          backgroundColor: c.glassBg, borderWidth: 1, borderColor: c.border,
+        }, pressed && { opacity: 0.65 }]}
+      >
+        <Ionicons name="arrow-back" size={18} color={c.textSubtle} />
+      </Pressable>
+
       <KeyboardAvoidingView
         style={s.kav}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

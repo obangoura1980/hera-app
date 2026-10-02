@@ -533,6 +533,9 @@ const PLANS = [
   { id: 'founding' as const, label: 'Founding Member', price: '$7.99', period: '/ month', monthly: null, badge: 'Limited', highlight: false },
 ];
 
+// Module-level so navigating away (e.g. to /login) and pressing back resumes the same step
+let lastOnboardingScreen = 1;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -545,7 +548,15 @@ export default function Onboarding() {
   const fadeInInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeOutInterval= useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const [screen, setScreen] = useState(1);
+  const [screen, setScreenState] = useState(lastOnboardingScreen);
+  // Wrap setScreen so the current step survives navigating away (e.g. to /login) and back
+  const setScreen = useCallback((v: number | ((s: number) => number)) => {
+    setScreenState(prev => {
+      const next = typeof v === 'function' ? v(prev) : v;
+      lastOnboardingScreen = next;
+      return next;
+    });
+  }, []);
   const [isMuted, setIsMuted] = useState(false);
   const isMutedRef = useRef(false); // ref so intervals always read current mute state
 
@@ -672,6 +683,7 @@ export default function Onboarding() {
   // reads the correct name/goals on first mount even before Context re-renders.
   const persistAndNavigate = useCallback(async (dest: '/(tabs)' | '/subscription') => {
     try { stopAudioNow(); } catch {}
+    lastOnboardingScreen = 1; // fresh run next time onboarding is entered
     const userName   = name.trim() || 'Beautiful Soul';
     const goalsArr   = goals.trim() ? [goals.trim()] : [];
     const userRecord = { name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, streak: 1 };
