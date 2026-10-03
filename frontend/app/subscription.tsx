@@ -537,7 +537,8 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
 
   const handleSend = useCallback(async () => {
     const trimmed = email.trim().toLowerCase();
-    if (!trimmed.includes('@') || !trimmed.includes('.')) {
+    // Client-side format check — no backend call for obviously invalid emails
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       showAlert('Invalid Email', 'Please enter a valid email address.');
       return;
     }

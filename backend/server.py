@@ -701,6 +701,8 @@ async def send_email(*, to: str, subject: str, html: str) -> Optional[str]:
         return resp.json().get("id")
     except httpx.HTTPStatusError as e:
         logger.error(f"Email send failed: {e.response.status_code} {e.response.text}")
+        if e.response.status_code == 422 and "undeliverable_recipient" in e.response.text:
+            raise HTTPException(status_code=400, detail="Please enter a valid email address.")
         raise HTTPException(status_code=502, detail="Failed to send email")
     except Exception as e:
         logger.error(f"Email send error: {e}")
