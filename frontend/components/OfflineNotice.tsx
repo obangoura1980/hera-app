@@ -1,13 +1,15 @@
 /**
- * OfflineNotice.tsx — global "no internet" popup.
- * Listens to NetInfo and shows a themed modal whenever connectivity drops;
- * auto-dismisses on reconnect, with a manual "Try Again" re-check.
+ * OfflineNotice.tsx — global "internet not available" toast.
+ * Slides down from the top whenever connectivity drops and stays visible
+ * until the connection returns (auto-hides on reconnect). Tap to re-check.
+ * Native uses @react-native-community/netinfo; web uses browser online/offline events.
  */
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { SlideInUp, SlideOutUp } from 'react-native-reanimated';
 import Ionicons from '@react-native-vector-icons/ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/useTheme';
 import { Spacing, Radius, FontSize } from '@/constants/theme';
 
@@ -16,6 +18,7 @@ const isOffline = (s: { isConnected: boolean | null; isInternetReachable: boolea
 
 export function OfflineNotice() {
   const { colors: c, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const [offline, setOffline] = useState(false);
   const [checking, setChecking] = useState(false);
 
@@ -36,6 +39,7 @@ export function OfflineNotice() {
   }, []);
 
   const retry = async () => {
+    if (checking) return;
     setChecking(true);
     try {
       if (Platform.OS === 'web') setOffline(!navigator.onLine);
@@ -47,36 +51,49 @@ export function OfflineNotice() {
     }
   };
 
+  if (!offline) return null;
+
   return (
-    <Modal visible={offline} transparent animationType="fade" statusBarTranslucent>
-      <View style={st.overlay}>
-        <View style={[st.card, { backgroundColor: isDark ? '#12142A' : '#FFFFFF', borderColor: c.border }]}>
-          <LinearGradient colors={[c.primary, c.primaryDark]} style={st.iconWrap}>
-            <Ionicons name="cloud-offline-outline" size={30} color="white" />
-          </LinearGradient>
-          <Text style={[st.title, { color: c.textWhite }]}>No Internet Connection</Text>
-          <Text style={[st.msg, { color: c.textMuted }]}>
-            Hera needs a connection to sync your journey. Please check your internet and try again.
+    <Animated.View
+      entering={SlideInUp.duration(280)}
+      exiting={SlideOutUp.duration(220)}
+      style={[st.wrap, { top: insets.top + 8 }]}
+      pointerEvents="box-none"
+    >
+      <Pressable onPress={retry} accessibilityLabel="No internet connection. Tap to retry">
+        <View style={[st.toast, { backgroundColor: isDark ? '#1A1D33' : '#FFFFFF', borderColor: c.border }]}>
+          <Ionicons name="cloud-offline-outline" size={16} color={c.error} />
+          <Text style={[st.txt, { color: c.textWhite }]}>
+            {checking ? 'Checking connection…' : 'Internet not available'}
           </Text>
-          <Pressable onPress={retry} disabled={checking} style={({ pressed }) => [st.btnWrap, (pressed || checking) && { opacity: 0.75 }]}>
-            <LinearGradient colors={[c.primary, c.primaryDark]} style={st.btn}>
-              <Ionicons name="refresh" size={15} color="white" />
-              <Text style={st.btnTxt}>{checking ? 'Checking…' : 'Try Again'}</Text>
-            </LinearGradient>
-          </Pressable>
         </View>
-      </View>
-    </Modal>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: Spacing.xl },
-  card: { width: '100%', maxWidth: 340, borderRadius: Radius.xxl, borderWidth: 1, padding: Spacing.xl, alignItems: 'center', gap: Spacing.md },
-  iconWrap: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: FontSize.lg, fontWeight: '700', textAlign: 'center' },
-  msg: { fontSize: FontSize.sm, textAlign: 'center', lineHeight: 20 },
-  btnWrap: { borderRadius: Radius.full, overflow: 'hidden', marginTop: Spacing.xs },
-  btn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 12, paddingHorizontal: Spacing.xl },
-  btnTxt: { color: 'white', fontSize: FontSize.base, fontWeight: '700' },
+  wrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 9999,
+  },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  txt: { fontSize: FontSize.sm, fontWeight: '600' },
 });
