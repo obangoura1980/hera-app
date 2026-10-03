@@ -161,7 +161,19 @@ export function AudioAffirmationPlayer({
           { uri: AMBIENT_MUSIC_URL },
           { isLooping: true, volume: 0.28, shouldPlay: false },
         );
-        if (mounted) bgSoundR.current = sound;
+        if (mounted) {
+          bgSoundR.current = sound;
+          // Prime the buffer (silent play → stop) so the first real Play starts instantly.
+          // On web, autoplay policy may block this — the catch/finally keeps volume correct.
+          try {
+            await sound.setVolumeAsync(0);
+            await sound.playAsync();
+            await sound.stopAsync(); // pause + rewind to 0, buffer stays warm
+          } catch {
+          } finally {
+            await sound.setVolumeAsync(0.28).catch(() => {});
+          }
+        }
       } catch {
         // No background music — visuals-only graceful degradation
       }

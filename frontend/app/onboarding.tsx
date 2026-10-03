@@ -270,8 +270,9 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
         {onToggleMute ? <MuteBtn isMuted={!!isMuted} onToggle={onToggleMute} /> : null}
       </View>
       <KeyboardAwareScrollView
+        style={{ flex: 1 }}
         bottomOffset={footerH + 16}
-        contentContainerStyle={ql.scroll}
+        contentContainerStyle={[ql.scroll, { paddingBottom: footerH + 24 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -973,6 +974,15 @@ export default function Onboarding() {
   return (
     <View style={{ flex: 1 }}>
       <LinearGradient colors={['#080A18', '#0D1035', '#131838']} style={{ flex: 1, paddingTop: insets.top }}>
+        {/* Back to the last question — breaks the paywall ↔ sign-in loop */}
+        <Pressable
+          onPress={() => setScreen(23)}
+          hitSlop={12}
+          accessibilityLabel="Back to questions"
+          style={[ws.backBtn, { marginLeft: Spacing.lg, marginTop: Spacing.sm }]}
+        >
+          <Ionicons name="arrow-back" size={18} color="rgba(255,255,255,0.45)" />
+        </Pressable>
         <ScrollView
           contentContainerStyle={[pw.scroll, { paddingBottom: insets.bottom + 140 }]}
           showsVerticalScrollIndicator={false}

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, TextInput, Modal,
-  KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions, GestureResponderEvent,
+  KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@react-native-vector-icons/ionicons';
@@ -11,7 +11,8 @@ import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
 import { useFocusEffect } from 'expo-router';
-import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Spacing, Radius, FontSize } from '@/constants/theme';
 import type { VisionItem } from '@/contexts/HeraContext';
 
@@ -75,86 +76,98 @@ function ProgressSlider({
   accentColor: string;
 }) {
   const { colors: c } = useTheme();
-  const trackRef = useRef<View>(null);
-  const trackXRef = useRef(0);   // absolute page-X of track start
-  const trackWRef = useRef(200); // track width
-  const [, forceRender] = useState(0);
+  const [trackW, setTrackW] = useState(0);
+  // Thumb position is a shared value — the drag animates on the UI thread with
+  // ZERO React re-renders; state only changes for the integer % label, and the
+  // parent form is notified once when the gesture ends. (Fixes drag lag.)
+  const pos = useSharedValue(0);
+  const startPos = useSharedValue(0);
+  const [shown, setShown] = useState(value);
 
-  // Measure track on layout and whenever the modal opens
-  const measureTrack = useCallback(() => {
-    trackRef.current?.measureInWindow((px, _py, width) => {
-      if (width > 0) {
-        trackXRef.current = px;
-        trackWRef.current = width;
-        forceRender(n => n + 1); // refresh thumb position after measurement
-      }
-    });
-  }, []);
-
-  const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
-
-  const handleTouch = useCallback((pageX: number) => {
-    const rel = pageX - trackXRef.current;
-    const pct = clamp((rel / trackWRef.current) * 100);
-    onChange(pct);
-  }, [onChange]);
-
-  const thumbLeft = Math.max(
-    0,
-    Math.min(trackWRef.current - THUMB_SIZE, (value / 100) * trackWRef.current - THUMB_SIZE / 2),
+  const clampPct = useCallback(
+    (px: number) => Math.max(0, Math.min(100, Math.round((px / Math.max(1, trackW)) * 100))),
+    [trackW],
   );
+  const commit = useCallback((px: number) => onChange(clampPct(px)), [onChange, clampPct]);
+  const liveUpdate = useCallback((px: number) => setShown(clampPct(px)), [clampPct]);
+
+  // Sync when the modal opens with an initial value or the track is measured
+  useEffect(() => {
+    pos.value = (value / 100) * trackW;
+    setShown(value);
+  }, [value, trackW]);
+
+  const pan = useMemo(() => Gesture.Pan()
+    .activeOffsetX([-4, 4])   // claim horizontal drags…
+    .failOffsetY([-14, 14])   // …but let vertical scrolling win
+    .onBegin(() => { startPos.value = pos.value; })
+    .onUpdate(e => {
+      const next = Math.max(0, Math.min(trackW, startPos.value + e.translationX));
+      pos.value = next;
+      runOnJS(liveUpdate)(next);
+    })
+    .onEnd(() => { runOnJS(commit)(pos.value); }),
+  [trackW, liveUpdate, commit]);
+
+  const tap = useMemo(() => Gesture.Tap()
+    .onEnd(e => {
+      const px = Math.max(0, Math.min(trackW, e.x));
+      pos.value = px;
+      runOnJS(liveUpdate)(px);
+      runOnJS(commit)(px);
+    }),
+  [trackW, liveUpdate, commit]);
+
+  const gesture = useMemo(() => Gesture.Exclusive(pan, tap), [pan, tap]);
+
+  const thumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: pos.value - THUMB_SIZE / 2 }],
+  }));
+  const fillStyle = useAnimatedStyle(() => ({ width: pos.value }));
 
   return (
     <View style={{ gap: Spacing.sm }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ fontSize: FontSize.sm, color: c.textMuted, fontWeight: '600' }}>Current Progress</Text>
-        <Text style={{ fontSize: FontSize.lg, color: accentColor, fontWeight: '800' }}>{value}%</Text>
+        <Text style={{ fontSize: FontSize.lg, color: accentColor, fontWeight: '800' }}>{shown}%</Text>
       </View>
 
-      {/* Invisible hit area — captures all touch/drag events */}
-      <View
-        ref={trackRef}
-        onLayout={measureTrack}
-        style={{ height: 44, justifyContent: 'center', position: 'relative' }}
-        onStartShouldSetResponder={() => true}
-        onMoveShouldSetResponder={() => true}
-        onResponderGrant={(e: GestureResponderEvent) => {
-          measureTrack();
-          handleTouch(e.nativeEvent.pageX);
-        }}
-        onResponderMove={(e: GestureResponderEvent) => {
-          handleTouch(e.nativeEvent.pageX);
-        }}
-        onResponderTerminationRequest={() => false}
-      >
-        {/* Track background */}
-        <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: c.border }} />
-        {/* Filled portion */}
+      {/* touchAction='pan-y' (web-only GestureDetector prop): vertical drags starting on
+          the slider scroll the modal, horizontal drags are claimed by the pan gesture. */}
+      <GestureDetector gesture={gesture} touchAction="pan-y">
         <View
-          style={{
-            position: 'absolute', left: 0, height: 6, borderRadius: 3,
-            backgroundColor: accentColor,
-            width: `${value}%` as any,
-          }}
-        />
-        {/* Thumb */}
-        <View
-          style={{
-            position: 'absolute',
-            width: THUMB_SIZE, height: THUMB_SIZE,
-            borderRadius: THUMB_SIZE / 2,
-            backgroundColor: accentColor,
-            borderWidth: 3, borderColor: 'white',
-            top: (44 - THUMB_SIZE) / 2,
-            left: thumbLeft,
-            shadowColor: accentColor,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.5,
-            shadowRadius: 6,
-            elevation: 4,
-          }}
-        />
-      </View>
+          collapsable={false}
+          onLayout={e => setTrackW(e.nativeEvent.layout.width)}
+          style={{ height: 44, justifyContent: 'center', position: 'relative' }}
+        >
+          {/* Track background */}
+          <View style={{ position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, backgroundColor: c.border }} />
+          {/* Filled portion — animated on the UI thread */}
+          <ReAnimated.View
+            style={[{
+              position: 'absolute', left: 0, height: 6, borderRadius: 3,
+              backgroundColor: accentColor,
+            }, fillStyle]}
+          />
+          {/* Thumb — animated on the UI thread */}
+          <ReAnimated.View
+            style={[{
+              position: 'absolute',
+              width: THUMB_SIZE, height: THUMB_SIZE,
+              borderRadius: THUMB_SIZE / 2,
+              backgroundColor: accentColor,
+              borderWidth: 3, borderColor: 'white',
+              top: (44 - THUMB_SIZE) / 2,
+              left: 0,
+              shadowColor: accentColor,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.5,
+              shadowRadius: 6,
+              elevation: 4,
+            }, thumbStyle]}
+          />
+        </View>
+      </GestureDetector>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <Text style={{ fontSize: FontSize.xs, color: c.textSubtle }}>Just started</Text>

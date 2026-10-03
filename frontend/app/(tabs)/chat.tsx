@@ -52,7 +52,6 @@ const createStyles = (c: ThemeColors) => StyleSheet.create({
   input:           { flex: 1, backgroundColor: c.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: c.border, paddingHorizontal: Spacing.md, paddingVertical: Platform.OS === 'ios' ? 12 : 8, fontSize: FontSize.base, color: c.textWhite, maxHeight: 120 },
   countBar:        { fontSize: 10, color: c.textSubtle, textAlign: 'center', letterSpacing: 0.3 },
   upgradeLink:     { color: c.gold, fontWeight: '600' },
-  poweredBy:       { fontSize: 10, color: c.textSubtle, textAlign: 'center', letterSpacing: 0.3 },
   sendBtn:         { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 });
 
@@ -67,6 +66,7 @@ export default function ChatScreen() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  const streamingRef = useRef(''); // mirror of streamingText for use after the stream resolves
   const scrollRef = useRef<ScrollView>(null);
   const abortRef = useRef(false);
   // Auto-scroll: only auto-scroll when the user hasn't manually scrolled up
@@ -164,13 +164,13 @@ export default function ChatScreen() {
         goals: user.goals,
         focusAreas: user.focusAreas,
         onChunk: (_delta, accumulated) => {
-          if (!abortRef.current) setStreamingText(accumulated);
+          if (!abortRef.current) { streamingRef.current = accumulated; setStreamingText(accumulated); }
         },
       });
-      setStreamingText(prev => {
-        if (prev && !abortRef.current) addMessage({ role: 'hera', content: prev });
-        return '';
-      });
+      const finalText = streamingRef.current;
+      streamingRef.current = '';
+      setStreamingText('');
+      if (finalText && !abortRef.current) addMessage({ role: 'hera', content: finalText });
     } catch {
       setStreamingText('');
       addMessage({ role: 'hera', content: "I'm here with you always. Let me try again in a moment. 💜" });
@@ -320,9 +320,7 @@ export default function ChatScreen() {
               {remainingChats} free {remainingChats === 1 ? 'message' : 'messages'} remaining today{' · '}
               <Text style={s.upgradeLink}>Upgrade for unlimited</Text>
             </Text>
-          ) : (
-            <Text style={s.poweredBy}>Powered by OnSpace AI · GPT-5</Text>
-          )}
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </Animated.View>
