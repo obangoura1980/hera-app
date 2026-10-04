@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 22 (frontend-only, public preview, 375x667) verified BOTH fixes - ALL 15 checks PASSED. (1) CRITICAL iteration_21 regression FIXED: full onboarding -> Generate My Profile -> generating screen auto-completes (~10s) -> /subscription?from=onboarding email gate -> back arrow -> lands on Q20/20 'What kind of partner do you want to call in?' with partner text ('A kind ambitious partner') AND Yes-selection retained, 'Generate My Profile' enabled. NOT the 'Generating your stories' dead-end, NOT the paywall, NOT the splash. Back is a genuine pop (window.history.length 3->3, unchanged). Repeatable: forward again -> gate -> back -> Q20/20 again with answers intact; generating screen never reappears/re-fires after back. (2) IAP console warning FIXED: zero '[IAP] connectIAP returned false' messages across the entire session (code-gated behind !DEMO_CHECKOUT at SubscriptionContext.tsx:123; additionally the connectIAP effect is skipped entirely on web via Platform.OS check at :116, so it was web-unreachable regardless - native/demo path verified by code inspection). Regressions PASS: sign-in at gate with delivered@resend.dev + OTP override (code 1111, matched=1) -> premium isSubscribed redirect -> Home rendered; browser-back from Home lands on about:blank (exits PWA history) - never onboarding/sign-in/generating; fresh open starts at splash; welcome -> Log in -> /login -> back (aria-label='Go back') -> welcome. Zero console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "onboarding -> gate -> sign-in (existing premium account) -> Home", "issue": "MINOR/product-level: Home greets with the onboarding-entered name ('TestSeeker') instead of the account's stored name ('Maya') - persistAndNavigate's updateUser/AsyncStorage write runs before sign-in and the local record wins on first Home mount. Not a blocker; possible name-merge consideration for existing accounts signing in through the gate.", "affected_testIDs": []}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/screenshots/iter22_back_q20.png", "/app/test_reports/screenshots/iter22_back2_q20.png", "/app/test_reports/screenshots/iter22_gate.png", "/app/test_reports/screenshots/iter22_home.png", "/app/test_reports/iteration_22.json"],
+  "action_items": [
+    "None blocking - both fixes verified working.",
+    "Optional (carried over): add testID props to onboarding/subscription interactive elements; migrate deprecated shadow*/textShadow*/pointerEvents props; split onboarding.tsx (~1198 lines > 700 guideline).",
+    "Optional: decide whether an existing account signing in at the gate should keep its server-stored name instead of the freshly entered onboarding name (minor)."
+  ],
+  "critical_code_review_comments": [
+    "onboarding.tsx:726 persistAndNavigate now calls setScreen(23) which updates BOTH live state and module cache before router.push('/subscription') - verified: gate back reveals the mounted onboarding at Q20/20, and GenBar (screen 24) is never revealed. Root cause from iteration_21 fully resolved.",
+    "SubscriptionContext.tsx:123 warn correctly gated behind !DEMO_CHECKOUT; note the whole connectIAP effect is native-only (:116), so demo-mode silence on web is doubly guaranteed.",
+    "Web-only (unchanged, low priority): browser-back from Home exits to about:blank because dismissAll()+replace removed all in-app history entries - acceptable stack hygiene, no dead-end."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "100% (15/15 checks passed)"},
+  "seed_data_creation": "No new seed data. OTP override used for delivered@resend.dev (code 1111 via /tmp/otp_override.py, matched=1). Account remains signed-in + premium; a fresh onboarding journey (name 'TestSeeker', goals 'Abundance and love') was persisted to its local storage during the test run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both iteration_21 findings are fixed and verified end-to-end on the public preview. The full back/forward/sign-in journey now runs cleanly in one session with no console errors or IAP warnings. Automation notes (unchanged, still valid): page.url is a property; '/(tabs)' normalizes to '/'; generating->gate takes ~10s (use 30s wait for 'Create Account or Sign In'); gate back arrow = mouse.click(42,66); login back = [aria-label='Go back']; OTP override via subprocess python3 /tmp/otp_override.py <email> <code> after OTP send; Home assert text 'what do you want to'; browser-back from Home lands on about:blank (expected on web). delivered@resend.dev is premium - do not delete; demo purchase path still unexercised (needs a fresh non-premium account).",
+  "rca_of_issue": "No open issues. Regression RCA (from iteration_21, now fixed): persistAndNavigate previously called setLastOnboardingScreen(23) (module cache only) while live screen state stayed 24 (Generating); router.push kept /onboarding mounted so router.back() revealed the stuck Generating dead-end. Fix at onboarding.tsx:726 uses setScreen(23), updating live state + cache - verified by two consecutive back/forward cycles landing on Q20/20 with retained answers."
+}

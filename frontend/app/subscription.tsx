@@ -570,8 +570,8 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
           <Pressable
             onPress={() => {
               if (authStage === 'otp') { setAuthStage('email'); setOtp(''); }
-              else if (from === 'onboarding') router.replace('/onboarding'); // resume at the paywall, not page 1
-              else if (router.canGoBack()) router.back();
+              else if (router.canGoBack()) router.back(); // real back-nav to the previous onboarding page
+              else if (from === 'onboarding') router.replace('/onboarding');
             }}
             style={({ pressed }) => [ag.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', borderColor: cardBorder }, pressed && { opacity: 0.65 }]}
             hitSlop={12}
@@ -697,7 +697,10 @@ export default function SubscriptionScreen() {
   const { isDark } = useTheme();
 
   useEffect(() => {
-    if (isSubscribed) router.replace('/(tabs)');
+    if (isSubscribed) {
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(tabs)');
+    }
   }, [isSubscribed]);
 
   useEffect(() => {

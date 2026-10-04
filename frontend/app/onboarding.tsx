@@ -26,7 +26,23 @@ import { useHera } from '@/hooks/useHera';
 import { KeyboardAwareScrollView, KeyboardStickyView, KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/template';
-import { getLastOnboardingScreen, setLastOnboardingScreen } from '@/src/onboarding-progress';
+import { getLastOnboardingScreen, setLastOnboardingScreen, getAnswer, setAnswer } from '@/src/onboarding-progress';
+
+/** useState persisted in module memory so answers survive navigating away (e.g. to the sign-in gate) and back. */
+function useAnswerState<T>(key: string, initial: T) {
+  const [v, setV] = useState<T>(() => {
+    const cached = getAnswer<T>(key);
+    return cached !== undefined ? cached : initial;
+  });
+  const set = useCallback((nv: T | ((p: T) => T)) => {
+    setV(prev => {
+      const next = typeof nv === 'function' ? (nv as (p: T) => T)(prev) : nv;
+      setAnswer(key, next);
+      return next;
+    });
+  }, [key]);
+  return [v, set] as const;
+}
 
 const { width } = Dimensions.get('window');
 
@@ -574,29 +590,29 @@ export default function Onboarding() {
   const isMutedRef = useRef(false); // ref so intervals always read current mute state
 
   // ── Answers ────────────────────────────────────────────────────────────
-  const [referralCode, setReferralCode] = useState('');
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState('');
-  const [age, setAge] = useState('');
-  const [sexuality, setSexuality] = useState('');
-  const [gender, setGender] = useState('');
-  const [kids, setKids] = useState('');
-  const [goals, setGoals] = useState('');
-  const [motivation, setMotivation] = useState('');
-  const [obstacles, setObstacles] = useState('');
-  const [relationship, setRelationship] = useState('');
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [career, setCareer] = useState('');
-  const [workSentiment, setWorkSentiment] = useState('');
-  const [selfDesc, setSelfDesc] = useState('');
-  const [pastShapes, setPastShapes] = useState('');
-  const [dreamLocation, setDreamLocation] = useState('');
-  const [homeType, setHomeType] = useState('');
-  const [partnerManifest, setPartnerManifest] = useState('');
-  const [specificPerson, setSpecificPerson] = useState('');
+  const [referralCode, setReferralCode] = useAnswerState('referralCode', '');
+  const [name, setName] = useAnswerState('name', '');
+  const [location, setLocation] = useAnswerState('location', '');
+  const [age, setAge] = useAnswerState('age', '');
+  const [sexuality, setSexuality] = useAnswerState('sexuality', '');
+  const [gender, setGender] = useAnswerState('gender', '');
+  const [kids, setKids] = useAnswerState('kids', '');
+  const [goals, setGoals] = useAnswerState('goals', '');
+  const [motivation, setMotivation] = useAnswerState('motivation', '');
+  const [obstacles, setObstacles] = useAnswerState('obstacles', '');
+  const [relationship, setRelationship] = useAnswerState('relationship', '');
+  const [contacts, setContacts] = useAnswerState<Contact[]>('contacts', []);
+  const [career, setCareer] = useAnswerState('career', '');
+  const [workSentiment, setWorkSentiment] = useAnswerState('workSentiment', '');
+  const [selfDesc, setSelfDesc] = useAnswerState('selfDesc', '');
+  const [pastShapes, setPastShapes] = useAnswerState('pastShapes', '');
+  const [dreamLocation, setDreamLocation] = useAnswerState('dreamLocation', '');
+  const [homeType, setHomeType] = useAnswerState('homeType', '');
+  const [partnerManifest, setPartnerManifest] = useAnswerState('partnerManifest', '');
+  const [specificPerson, setSpecificPerson] = useAnswerState('specificPerson', '');
 
   const [contactModal, setContactModal] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<'annual' | 'premium' | 'founding'>('annual');
+  const [selectedPlan, setSelectedPlan] = useAnswerState<'annual' | 'premium' | 'founding'>('selectedPlan', 'annual');
 
   const { sendOTP, verifyOTPAndLogin } = useAuth();
 
@@ -705,9 +721,10 @@ export default function Onboarding() {
     ]).catch(() => {});
     updateUser({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true });
     if (dest === '/subscription') {
-      // Back from the sign-in gate should return to the paywall, not restart onboarding
-      setLastOnboardingScreen(25);
-      router.replace({ pathname: '/subscription', params: { from: 'onboarding' } });
+      // Push (not replace) so the sign-in gate's back button is a real back
+      // navigation that returns to this exact onboarding page.
+      setScreen(23); // live state + cache — /onboarding stays mounted under /subscription
+      router.push({ pathname: '/subscription', params: { from: 'onboarding' } });
     } else {
       setLastOnboardingScreen(1);
       router.replace(dest);

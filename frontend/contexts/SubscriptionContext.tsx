@@ -119,7 +119,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     connectIAP().then(async (ok) => {
       if (!mounted) return;
       if (!ok) {
-        console.warn('[IAP] connectIAP returned false — store unavailable on this platform');
+        // Expected while demo checkout is active (store stub) — only warn once real IAP is enabled
+        if (!DEMO_CHECKOUT) console.warn('[IAP] connectIAP returned false — store unavailable on this platform');
         return;
       }
       setIapReady(true);
@@ -324,6 +325,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         // Reflect the activated trial immediately so the tabs guard lets the user in
         applyIAPStatus({ isSubscribed: true, isTrial: true, plan: productKey, expiresAt: null, validatedAt: new Date().toISOString() });
         await checkSubscription();
+        // Drop onboarding/sign-in from the back stack so Home is the root
+        if (expoRouter.canDismiss()) expoRouter.dismissAll();
         expoRouter.replace('/(tabs)');
       } catch {
         showAlert('Something went wrong', 'Your trial could not be started. Please check your connection and try again — you have not been charged.');

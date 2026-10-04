@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 20 (frontend-only retest of iteration_19 HIGH issue) on the public preview at 375x667: ANSWER RETENTION FIX - PASS. Full onboarding with answers on every question (text inputs, option cards, Yes/No, contact modal, home grid) -> Generate My Profile -> generating -> /subscription?from=onboarding email gate -> back arrow lands on q20/20 with partner textarea intact ('TEST_PARTNER_TEXT kind funny tall'), 'No' Yes/No still selected (gradient fill + border rgb(192,132,252) vs unselected rgba(168,85,247,0.3)), and 'Generate My Profile' ENABLED (no 0.32 disabled opacity). STEP-BACK CHAIN - PASS: in-screen back arrow q20->q19 (home type 'Cabin' still gold-highlighted, screenshot-verified) ->q18 (dream location 'TEST_Beach in Bali' intact)->q17 (past shapes intact)->...->q3 (name 'TEST_Maya' intact). FORWARD-AGAIN - PASS: from q3 clicked only Continue/Done (no re-entry) straight to 20/20 -> Generate -> email gate again, proving every canNext gate was satisfied by cached answers. FRESH-START REGRESSION - PASS: same-session login via OTP override (delivered@resend.dev, mongo code_hash override, account NOT deleted) -> premium redirect to /(tabs) -> Profile -> Reset Journey -> Reset -> /onboarding splash; q3 name EMPTY and Continue DISABLED (opacity 0.32) - resetOnboardingProgress() correctly clears the module-level answer cache in-session. No app-breaking console errors (only pre-existing web deprecation warnings: shadow*/textShadow*/pointerEvents props, useNativeDriver JS fallback, expo-notifications web listener).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "onboarding.tsx / subscription.tsx interactive elements", "issue": "Still no testID props on onboarding CTAs (Continue/Skip/Yes/No/Generate My Profile), QuestionLayout back, AuthGateStep back - automation relies on exact text and coordinate clicks (question back at 42,32; auth-gate back at 42,66; profile tab icon at 305,610). Reference: /app/frontend/app/onboarding.tsx:279,304; /app/frontend/app/subscription.tsx:570-580"},
+      {"component": "onboarding.tsx styles", "issue": "Console warnings on web preview: deprecated shadow*/textShadow* style props (onboarding.tsx:415 heraTitle textShadow) and props.pointerEvents (onboarding.tsx:406) - migrate to boxShadow/textShadow style props and style.pointerEvents. Cosmetic on web, will warn/ break on future RN versions."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_20.json", "/app/test_reports/screenshots/iter20_q20_filled.jpeg", "/app/test_reports/screenshots/iter20_emailgate.jpeg", "/app/test_reports/screenshots/iter20_back_q20.jpeg", "/app/test_reports/screenshots/iter20_back_q19.jpeg", "/app/test_reports/screenshots/iter20_forward_again.jpeg", "/app/test_reports/screenshots/iter20_reset_confirm.jpeg", "/app/test_reports/screenshots/iter20_after_reset_splash.jpeg", "/app/test_reports/screenshots/iter20_after_reset_q3.jpeg"],
+  "action_items": [
+    "No blocking fixes. The iteration_19 answer-retention issue is fully resolved by the module-level answer cache (src/onboarding-progress.ts getAnswer/setAnswer + useAnswerState in onboarding.tsx).",
+    "Optional (carried over): add testID props to onboarding/subscription/tab-bar interactive elements for robust automation.",
+    "Optional: migrate deprecated shadow*/textShadow*/pointerEvents props flagged in web console.",
+    "Optional: onboarding.tsx is 1198 lines (>700 guideline) - consider splitting question screens into modules in a future refactor (pre-existing, not blocking)."
+  ],
+  "critical_code_review_comments": [
+    "Fix verified correct: useAnswerState (onboarding.tsx:32-45) initializes from getAnswer(key) and mirrors every set into setAnswer(key); all ~20 answer fields (incl. contacts array and selectedPlan) use it (onboarding.tsx:593-615). resetOnboardingProgress (onboarding-progress.ts:18) resets step AND clearOnboardingAnswers - invoked by profile.tsx Reset Journey (504), account deletion (471) and login.tsx fresh-start paths.",
+    "setAnswer is called inside the setV updater (side effect in updater, onboarding.tsx:38-42) - idempotent write so harmless even under StrictMode double-invoke, but same anti-pattern family as flagged in iter17/19.",
+    "Known limitation (intended per handoff): answer cache is module-level in-memory; a full page reload wipes it even though lastOnboardingScreen and hera_onboarded persist elsewhere. Matches stated design.",
+    "Reset Journey on a signed-in user also calls POST /api/account/reset - succeeded silently; delivered@resend.dev account intact (journey data wiped only, as designed)."
+  ],
+  "updated_files": ["/tmp/otp_override.py (test helper only, no app code touched)"],
+  "success_rate": {"backend": "N/A (frontend-only request; OTP send/verify + account/reset exercised incidentally - all OK)", "frontend": "100% (5/5 flows: q20 resume retention, step-back retention, forward-again, Reset Journey fresh start, clean console)"},
+  "seed_data_creation": "TEST_-prefixed onboarding answers entered in ephemeral test browser sessions only. Reset Journey wiped journey data for delivered@resend.dev (as the requested test requires); the account itself was NOT deleted and can still log in via OTP override.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Answer retention verified end-to-end. Automation notes: (1) module-level cache dies with the browser session - retention tests must run in ONE browser_automation call. (2) Tab bar has icon-only tabs: profile = rightmost icon, mouse.click(305,610) at 375x667. (3) Question back arrow = mouse.click(42,32); auth-gate back = mouse.click(42,66). (4) Playwright sandbox python lacks pymongo - use subprocess python3 /tmp/otp_override.py <email> <code> (system python3 has pymongo). (5) Reset-alert modal on web: click text 'Reset' (exact). (6) Yes/No selection check: selected border rgb(192,132,252) vs unselected rgba(168,85,247,0.3). (7) Disabled CTA = opacity 0.32 on an ancestor of the label text.",
+  "rca_of_issue": "ITERATION_19 ISSUE NOW RESOLVED. Previous RCA: answers were component-local useState lost when router.replace('/subscription') unmounted onboarding. Fix: module-level answers cache in src/onboarding-progress.ts with useAnswerState hook mirroring every field; verified retained across the replace->unmount->remount round-trip and correctly cleared in-session by resetOnboardingProgress (Reset Journey) - confirmed by empty name field + disabled Continue (opacity 0.32) after reset."
+}

@@ -9,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import AsyncStorage from '@/src/utils/async-storage';
-import { FunctionsHttpError } from '@/template/core/supabase-types';
 import { Image } from 'expo-image';
 import { useHera } from '@/hooks/useHera';
 import {
@@ -444,8 +443,7 @@ function ProfileScreen() {
       const supabase = getSupabaseClient();
       const { error: verifyError } = await supabase.auth.verifyOtp({ email: deletionEmail, token: otpString, type: 'email' });
       if (verifyError) { showAlert('Invalid Code', 'The code is incorrect or expired.'); setOtpCode(['', '', '', '']); otpRefs.current[0]?.focus(); return; }
-      const { error } = await supabase.functions.invoke('delete-account', {});
-      if (error) { let msg = error.message; if (error instanceof FunctionsHttpError) { try { msg = await error.context?.text() || msg; } catch {} } showAlert('Deletion Failed', msg || 'Unable to delete account.'); return; }
+      await api('/account', { method: 'DELETE' });
       setDeleteStep('success');
     } catch (e: any) { showAlert('Error', e.message || 'Something went wrong.'); }
     finally { setOtpLoading(false); }

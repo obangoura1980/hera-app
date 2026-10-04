@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 18 (both) verified the delete-account 404 bug fix end-to-end. BACKEND (pytest 5/5 PASS): health, DELETE /api/account auth guards (401 no-token/bad-token), premium regression (delivered@resend.dev login 200 + is_premium intact), and a full throwaway lifecycle on delete-me@resend.dev: OTP auto-register -> /auth/me 200 -> POST /account/reset ok (reset-journey regression) -> deletion OTP send (should_create_user=false) -> wrong code 400 'Invalid code' with account NOT deleted -> correct code -> DELETE /api/account 200 {ok:true} -> both old/new tokens 401 -> user doc gone from mongo -> password login 401 -> same email re-registers as a FRESH user (new id, is_premium=false) -> cleanup delete. FRONTEND (Playwright, 375x667, public preview): Settings -> Delete Account -> type DELETE -> 'Delete Forever' -> OTP step 'Verify Your Identity' shows the account email (UI send via shim -> /api/auth/otp/send succeeded, NO 404) -> wrong code 0000 -> 'Invalid Code' alert shown, stays on OTP step, account intact -> correct code -> 'Account Deleted' success screen (checklist render) -> auto-cleanup -> redirect to /onboarding splash -> hera_token cleared from localStorage. No 'Deletion Failed' alert, no 404, zero app console errors (only pre-existing RNW deprecation warnings). profile.tsx:446 confirmed using api('/account',{method:'DELETE'}); no FunctionsHttpError / functions.invoke('delete-account') left in profile.tsx.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/account", "issue": "Deletes USER_COLLECTIONS (journal, goals, coach_messages, favorites, activities) + soft-deletes files + user doc, but does NOT delete otp_log entries for the user's email (housekeeping only; otp_log is rate-limit bookkeeping and OTPs themselves are deleted on verify). Harmless."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Delete-account modal / Settings inputs", "issue": "No testID props on the Delete Account row, DELETE confirm input, OTP boxes, or Verify & Delete button - automation relies on text/placeholder/maxlength selectors. Reference: /app/frontend/app/(tabs)/profile.tsx:927,954,974,999"},
+      {"component": "Web preview console", "issue": "Pre-existing RNW deprecation warnings (shadow*/textShadow* style props, props.pointerEvents) on every load; cosmetic only. Reference: /app/frontend/app/(tabs)/profile.tsx:131 (shadowRadius etc.)"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_18.json", "/app/backend/tests/test_delete_account.py", "/app/test_reports/pytest/pytest_delete_account.xml", "/app/test_reports/screenshots/iter18_delete_confirm.png", "/app/test_reports/screenshots/iter18_otp_step.png", "/app/test_reports/screenshots/iter18_invalid_code.png", "/app/test_reports/screenshots/iter18_success.png", "/app/test_reports/screenshots/iter18_onboarding.png"],
+  "action_items": [
+    "No required fixes - the 404 delete-account bug is verified FIXED end-to-end (UI + API + DB + post-delete auth rejection + fresh re-registration).",
+    "Optional: add testID props to delete-flow elements in profile.tsx for robust automation.",
+    "Optional: also purge otp_log rows for the deleted user's email in DELETE /api/account for complete hygiene."
+  ],
+  "critical_code_review_comments": [
+    "Fix verified in code: profile.tsx handleVerifyAndDelete (line 438-450) verifies OTP via shim -> /api/auth/otp/verify then calls api('/account', { method: 'DELETE' }) which throws ApiError with server detail on failure (src/api.ts:24-45). No Supabase edge-function invoke remains in profile.tsx; FunctionsHttpError import gone.",
+    "Shim correctness: emergent-client.ts signInWithOtp -> POST /api/auth/otp/send (honors shouldCreateUser:false -> 404 for unknown email), verifyOtp -> POST /api/auth/otp/verify and setSession(new token), so the subsequent DELETE /account runs with the fresh token - works because verify does not rotate user id.",
+    "Auto-cleanup (profile.tsx:467-477): 2.8s timer -> AsyncStorage.clear() -> resetOnboardingProgress() -> logout() (secureRemove hera_token - confirmed null after run) -> router.replace('/onboarding'). Verified live: final URL /onboarding, token cleared.",
+    "Server-side delete_account (server.py:325-331) deletes the user doc, so user_from_token 401s for ALL outstanding tokens of that user (verified for both pre- and post-OTP tokens) - correct invalidation strategy without a token blocklist.",
+    "OTP rate limit (5 sends/10min per email, server.py:767-769) surfaced correctly in the UI as 'Too many codes requested. Please try again in a few minutes' alert during testing - error propagation through the shim works."
+  ],
+  "updated_files": ["/app/backend/tests/test_delete_account.py (new regression suite)"],
+  "success_rate": {"backend": "100% (5/5 pytest)", "frontend": "100% (full delete E2E incl. negative OTP path, success screen, redirect, token cleanup)"},
+  "seed_data_creation": "Throwaway account delete-me@resend.dev created via OTP, promoted to is_premium=true in mongo (needed to reach /(tabs) past the paywall gate), then DELETED via the tested flow; its otps and otp_log rows purged afterwards. delivered@resend.dev untouched (login + premium re-verified 200/true).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Delete-account flow fully verified. Automation notes: (1) index.tsx gate: hera_onboarded must be stored as JSON.stringify('true') (storage layer JSON-encodes; index compares v === 'true'). (2) Non-premium accounts are redirected to /subscription paywall - set is_premium=true in mongo to reach tabs with a fresh account. (3) Profile tab: click rightmost tab icon at (305,608) at 375x667; direct goto /profile gets redirected to / by the index gate. (4) OTP boxes selector: input[maxlength='1'] (input:visible also matches Switch checkboxes). (5) UI-driven OTP sends count against the 5/10min otp_log rate limit - clear db.otp_log for the test email before UI reruns. (6) Mongo OTP override mid-script works via subprocess mongosh: code_hash=sha256(email:code:JWT_SECRET). (7) Wrong-code alert is a custom modal with an OK button (text 'Invalid Code').",
+  "rca_of_issue": "ORIGINAL BUG: delete-account flow called supabase.functions.invoke('delete-account') which 404'd. FIX VERIFIED: profile.tsx now calls DELETE /api/account (server.py:325) after OTP re-verification; returns {ok:true}, deletes user + user collections, soft-deletes files. Reproduction of fixed flow: Settings -> Delete Account -> type DELETE -> Delete Forever -> 4-digit OTP -> Verify & Delete -> 'Account Deleted' -> /onboarding. Verified no 404/Deletion Failed at any step; wrong OTP shows 'Invalid Code' without deleting; post-delete all tokens 401 and the email re-registers as a fresh account."
+}
