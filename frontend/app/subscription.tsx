@@ -567,17 +567,15 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
           contentContainerStyle={{ paddingHorizontal: Spacing.xl, paddingTop: insets.top + 48, paddingBottom: insets.bottom + 40, gap: Spacing.xl, alignItems: 'center' }}
           keyboardShouldPersistTaps="handled"
         >
+          {authStage === 'otp' && (
           <Pressable
-            onPress={() => {
-              if (authStage === 'otp') { setAuthStage('email'); setOtp(''); }
-              else if (router.canGoBack()) router.back(); // real back-nav to the previous onboarding page
-              else if (from === 'onboarding') router.replace('/onboarding');
-            }}
+            onPress={() => { setAuthStage('email'); setOtp(''); }}
             style={({ pressed }) => [ag.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)', borderColor: cardBorder }, pressed && { opacity: 0.65 }]}
             hitSlop={12}
           >
             <Ionicons name="arrow-back" size={18} color={bodyColor} />
           </Pressable>
+          )}
 
           <Animated.View entering={FadeInDown.duration(420).delay(60)} style={{ alignItems: 'center', gap: Spacing.md }}>
             <Image source={require('@/assets/images/logo.png')} style={{ width: 88, height: 88 }} contentFit="contain" transition={200} />
