@@ -569,7 +569,7 @@ export default function DiscoverDetailScreen() {
 
           <View style={s.authorRow}>
             <Image
-              source={require('@/assets/images/logo.png')}
+              source={isDark ? require('@/assets/images/logo.png') : require('@/assets/images/logo-light.png')}
               style={s.authorAvatar}
               contentFit="contain"
             />

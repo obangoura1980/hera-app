@@ -444,7 +444,7 @@ function SplashScreen({ onContinue, onAudioStart, isMuted, onToggleMute }: { onC
         <Animated.View style={{ position: 'absolute', width: 330, height: 330, borderRadius: 165, backgroundColor: T('rgba(168,85,247,0.12)'), borderWidth: 1, borderColor: T('rgba(168,85,247,0.3)'), transform: [{ scale: pulse }] }} />
         <Animated.View style={{ position: 'absolute', width: 480, height: 480, borderRadius: 240, backgroundColor: T('rgba(236,72,153,0.06)'), borderWidth: 1, borderColor: T('rgba(236,72,153,0.1)'), transform: [{ scale: pulse }], opacity: 0.55 }} />
         <Animated.View style={{ alignItems: 'center', gap: Spacing.xl, opacity: fade }}>
-          <Image source={require('@/assets/images/logo.png')} style={{ width: 110, height: 110 }} contentFit="contain" transition={400} />
+          <Image source={(IS_DARK ? require('@/assets/images/logo.png') : require('@/assets/images/logo-light.png'))} style={{ width: 110, height: 110 }} contentFit="contain" transition={400} />
           <Text style={spl.heraTitle}>{twText}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
             <Ionicons name="sparkles" size={11} color={Colors.gold} />
@@ -813,7 +813,7 @@ export default function Onboarding() {
               </View>
             </View>
             <View style={ws.hero}>
-              <Image source={require('@/assets/images/logo.png')} style={ws.logo} contentFit="contain" transition={300} />
+              <Image source={(IS_DARK ? require('@/assets/images/logo.png') : require('@/assets/images/logo-light.png'))} style={ws.logo} contentFit="contain" transition={300} />
               <View style={ws.badge}>
                 <Ionicons name="sparkles" size={10} color={Colors.gold} />
                 <Text style={ws.badgeTxt}>AI Manifestation Companion</Text>

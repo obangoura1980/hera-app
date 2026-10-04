@@ -380,7 +380,7 @@ export default function LoginScreen() {
           bounces={false}
         >
           <View style={s.logoWrap}>
-            <Image source={require('@/assets/images/logo.png')} style={s.logoImg} contentFit="contain" transition={300} />
+            <Image source={isDark ? require('@/assets/images/logo.png') : require('@/assets/images/logo-light.png')} style={s.logoImg} contentFit="contain" transition={300} />
           </View>
 
           <View style={s.headingWrap}>

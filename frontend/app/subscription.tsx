@@ -150,7 +150,7 @@ function TrialSummaryStep({
           {/* Price callout */}
           <View style={ts.priceRow}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Spacing.sm }}>
-              <Text style={ts.freePrice}>$0.00</Text>
+              <Text style={[ts.freePrice, { color: isDark ? '#A855F7' : c.primary }]}>$0.00</Text>
               <Text style={[ts.strikePrice, { color: bodyColor }]}>
                 {billing === 'yearly' ? yearlyPriceStr : monthlyPriceStr}
               </Text>
@@ -221,7 +221,7 @@ function TrialSummaryStep({
             onPress={onNext}
             style={({ pressed }) => [{ borderRadius: Radius.xxl, overflow: 'hidden' }, pressed && { opacity: 0.85 }]}
           >
-            <LinearGradient colors={['#A855F7', '#EC4899']} style={ts.ctaGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={isDark ? (['#A855F7', '#EC4899'] as const) : [c.primary, c.primaryDark]} style={ts.ctaGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Ionicons name="sparkles" size={18} color="white" />
               <Text style={ts.ctaTxt}>{ctaLabel}</Text>
             </LinearGradient>
@@ -321,7 +321,7 @@ function CheckoutBreakdownStep({
           <Ionicons name="arrow-back" size={18} color={bodyColor} />
         </Pressable>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Image source={require('@/assets/images/logo.png')} style={{ width: 28, height: 28 }} contentFit="contain" />
+          <Image source={isDark ? require('@/assets/images/logo.png') : require('@/assets/images/logo-light.png')} style={{ width: 28, height: 28 }} contentFit="contain" />
           <Text style={[cb.brand, { color: titleColor }]}>HERA</Text>
         </View>
         <View style={{ width: 36 }} />
@@ -345,7 +345,7 @@ function CheckoutBreakdownStep({
         <Animated.View entering={FadeInDown.duration(440).delay(100)} style={[cb.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
           <View style={cb.lineItem}>
             <View style={[cb.productIconWrap, { backgroundColor: isDark ? '#1A0A35' : '#F5C2C7' }]}>
-              <Image source={require('@/assets/images/logo.png')} style={{ width: 22, height: 22 }} contentFit="contain" />
+              <Image source={isDark ? require('@/assets/images/logo.png') : require('@/assets/images/logo-light.png')} style={{ width: 22, height: 22 }} contentFit="contain" />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={[cb.lineLabel, { color: titleColor }]}>{productLabel}</Text>
@@ -361,7 +361,7 @@ function CheckoutBreakdownStep({
           <View style={[cb.divider, { backgroundColor: lineColor }]} />
           <View style={[cb.dueTodayRow, { backgroundColor: isDark ? 'rgba(168,85,247,0.07)' : 'rgba(196,112,122,0.07)', borderColor: isDark ? 'rgba(168,85,247,0.2)' : 'rgba(196,112,122,0.2)' }]}>
             <Text style={[cb.dueTodayLabel, { color: titleColor }]}>Total due today</Text>
-            <Text style={cb.dueTodayAmt}>$0.00</Text>
+            <Text style={[cb.dueTodayAmt, { color: isDark ? '#A855F7' : c.primary }]}>$0.00</Text>
           </View>
         </Animated.View>
 
@@ -441,7 +441,7 @@ function CheckoutBreakdownStep({
             disabled={isPurchasing}
             style={({ pressed }) => [{ borderRadius: Radius.xxl, overflow: 'hidden' }, (pressed || isPurchasing) && { opacity: 0.8 }]}
           >
-            <LinearGradient colors={['#A855F7', '#EC4899']} style={cb.ctaGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={isDark ? (['#A855F7', '#EC4899'] as const) : [c.primary, c.primaryDark]} style={cb.ctaGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               {isPurchasing
                 ? <ActivityIndicator color="white" size="small" />
                 : (<><Ionicons name="logo-apple" size={18} color="white" /><Text style={cb.ctaTxt}>{confirmLabel}</Text></>)
@@ -578,7 +578,7 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
           )}
 
           <Animated.View entering={FadeInDown.duration(420).delay(60)} style={{ alignItems: 'center', gap: Spacing.md }}>
-            <Image source={require('@/assets/images/logo.png')} style={{ width: 88, height: 88 }} contentFit="contain" transition={200} />
+            <Image source={isDark ? require('@/assets/images/logo.png') : require('@/assets/images/logo-light.png')} style={{ width: 88, height: 88 }} contentFit="contain" transition={200} />
             <Text style={[ag.title, { color: titleColor }]}>
               {authStage === 'email' ? 'Create Account or Sign In' : 'Check Your Email'}
             </Text>
@@ -614,7 +614,7 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
                   disabled={operationLoading || !email.trim()}
                   style={({ pressed }) => [{ borderRadius: Radius.xl, overflow: 'hidden' }, (pressed || operationLoading || !email.trim()) && { opacity: 0.65 }]}
                 >
-                  <LinearGradient colors={['#A855F7', '#EC4899']} style={ag.ctaBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <LinearGradient colors={isDark ? (['#A855F7', '#EC4899'] as const) : [c.primary, c.primaryDark]} style={ag.ctaBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                     {operationLoading
                       ? <ActivityIndicator color="white" size="small" />
                       : (<><Ionicons name="send" size={16} color="white" /><Text style={ag.ctaTxt}>Continue with Email</Text></>)}
@@ -629,7 +629,7 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
                   onChangeText={t => setOtp(t.replace(/\D/g, '').slice(0, 4))}
                   placeholder="• • • •"
                   placeholderTextColor={bodyColor}
-                  style={[ag.otpInput, { backgroundColor: inputBg, borderColor: otp.length === 4 ? '#8B5CF6' : inputBorder, color: titleColor }]}
+                  style={[ag.otpInput, { backgroundColor: inputBg, borderColor: otp.length === 4 ? c.primary : inputBorder, color: titleColor }]}
                   keyboardType="number-pad"
                   autoFocus
                   maxLength={4}
@@ -641,7 +641,7 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
                   disabled={operationLoading || checking || otp.length < 4}
                   style={({ pressed }) => [{ borderRadius: Radius.xl, overflow: 'hidden' }, (pressed || operationLoading || checking || otp.length < 4) && { opacity: 0.65 }]}
                 >
-                  <LinearGradient colors={['#A855F7', '#EC4899']} style={ag.ctaBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <LinearGradient colors={isDark ? (['#A855F7', '#EC4899'] as const) : [c.primary, c.primaryDark]} style={ag.ctaBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                     {operationLoading || checking
                       ? <ActivityIndicator color="white" size="small" />
                       : (<><Ionicons name="checkmark-circle" size={16} color="white" /><Text style={ag.ctaTxt}>Verify &amp; Continue</Text></>)}
