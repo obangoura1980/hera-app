@@ -804,9 +804,14 @@ async def otp_verify(data: OtpVerifyIn):
     return {"access_token": make_token(user.id), "token_type": "bearer", "user": user.public()}
 
 
+# Accounts that always get premium without payment (app owner / internal testing)
+PREMIUM_BYPASS_EMAILS = {"iaminamrana@gmail.com"}
+
+
 @api.get("/subscription")
 async def subscription(user: User = Depends(current_user)):
-    return {"subscribed": user.is_premium, "is_trial": False, "plan": "yearly" if user.is_premium else "free",
+    premium = user.is_premium or user.email in PREMIUM_BYPASS_EMAILS
+    return {"subscribed": premium, "is_trial": False, "plan": "yearly" if premium else "free",
             "subscription_end": None, "product_id": None}
 
 
