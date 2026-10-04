@@ -1,5 +1,4 @@
 import React, { createContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { useColorScheme } from 'react-native';
 import AsyncStorage from '@/src/utils/async-storage';
 import { LightColors, DarkColors, ThemeColors } from '@/constants/theme';
 
@@ -14,22 +13,16 @@ export const ThemeContext = createContext<ThemeContextType | undefined>(undefine
 const THEME_KEY = '@hera_theme';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const systemScheme = useColorScheme(); // 'dark' | 'light' | null
-  const [isDark, setIsDark] = useState(systemScheme !== 'light'); // follow system on first render
+  const [isDark, setIsDark] = useState(true); // dark is the default for new users
 
   useEffect(() => {
     AsyncStorage.getItem(THEME_KEY)
       .then(v => {
-        if (v !== null) {
-          // User has manually overridden — respect their choice
-          setIsDark(v === 'dark');
-        } else {
-          // No manual override — follow system theme
-          setIsDark(systemScheme !== 'light');
-        }
+        // Only a manual toggle overrides the dark default
+        if (v !== null) setIsDark(v === 'dark');
       })
-      .catch(() => { setIsDark(systemScheme !== 'light'); });
-  }, [systemScheme]);
+      .catch(() => {});
+  }, []);
 
   const toggleTheme = useCallback(() => {
     setIsDark(prev => {
