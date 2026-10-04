@@ -14,6 +14,16 @@ import { useFonts } from 'expo-font';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { OfflineNotice } from '@/components/OfflineNotice';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { initializeRevenueCat, RCSubscriptionProvider } from '@/src/lib/revenuecat';
+
+// RevenueCat must be configured at module scope, once, before any component mounts.
+const queryClient = new QueryClient();
+try {
+  initializeRevenueCat();
+} catch (err) {
+  console.warn('RevenueCat unavailable:', err);
+}
 
 function AppContent() {
   const { isLoading } = useHera();
@@ -62,6 +72,8 @@ export default function RootLayout() {
     <KeyboardProvider>
     <ThemeProvider>
     <AlertProvider>
+    <QueryClientProvider client={queryClient}>
+    <RCSubscriptionProvider>
         <SafeAreaProvider>
           <AuthProvider>
             <SubscriptionProvider>
@@ -71,6 +83,8 @@ export default function RootLayout() {
             </SubscriptionProvider>
           </AuthProvider>
         </SafeAreaProvider>
+    </RCSubscriptionProvider>
+    </QueryClientProvider>
     </AlertProvider>
     </ThemeProvider>
     </KeyboardProvider>

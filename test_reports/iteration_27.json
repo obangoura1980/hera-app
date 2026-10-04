@@ -1,0 +1,61 @@
+{
+  "summary": "RETEST #2 (frontend-only, mobile 390x844, public preview) of the RevenueCat identity fix. CRITICAL PURCHASE FLOW NOW FIXED: the useSyncExternalStore reactive identity fix works — full E2E passed: fresh account (test_rc2_buyer_*@resend.dev via OTP override) -> onboarding (20 questions + profile generation) -> paywall auth gate -> email OTP sign-in (POST /v1/subscribers/identify fired) -> plan step -> Start Free Trial -> Confirm Free Trial -> purchases-js Test Store modal OPENED (screenshot: 'Test Store Purchase / pro.annual / $79.99' with 'Test valid purchase'/'Test failed purchase'/'Cancel') -> test purchase completed -> entitlement 'pro' activated ('Welcome to Hera Premium! 🌟 / Subscription activated') -> tabs Home rendered with tab bar -> Settings shows '✨ Annual / Hera Annual / Hera Premium / Active' -> cold reload stays on tabs. Monthly variant ($9.99/mo) also purchased successfully on a second fresh account. REGRESSIONS ALL PASS: restore on fresh account shows 'No Active Subscription'; owner bypass iaminamrana@gmail.com lands on tabs with 'Hera Annual'+'Hera Premium/Active'; sign-out -> /login; re-sign-in fires identify again (rebind PASS). PRICES: STILL $9.99/mo and $79.99/yr — the re-upsert to $12.99/$89.99 did NOT apply (verified via rcbilling GET /products: amount 999/7999, trial: null, AND paywall UI strings 'Annual · $79.99/yr', 'Monthly · $9.99/mo'). NEW MINOR ISSUE: post-purchase navigation renders tabs Home but the browser URL stays at /subscription (expo-router web quirk; cold reload lands correctly on tabs).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Post-purchase navigation (SubscriptionContext.purchasePlan / subscription.tsx isSubscribed effect)", "issue": "After 'Test valid purchase' and dismissing the Welcome alert, the user SEES tabs Home (tab bar + home content rendered) but the browser address bar stays at /subscription — router.replace('/(tabs)') renders the tabs without updating the web URL. Functional outcome correct; URL stale until next navigation/reload. Web-preview-only cosmetic quirk; cold reload lands on tabs correctly. Reference: /app/frontend/contexts/SubscriptionContext.tsx:191-193, /app/frontend/app/subscription.tsx:703-708.", "testID": "", "priority": "LOW"},
+      {"component": "Onboarding paywall hardcoded PLANS", "issue": "Onboarding screen 25 shows hardcoded prices $89.99/yr, $12.99/mo, $7.99 'Founding Member' (PLANS const) which do NOT match the actual store checkout ($79.99/$9.99, no founding SKU). Users see different prices on the two paywalls. Reference: /app/frontend/app/onboarding.tsx:614-618.", "testID": "", "priority": "MEDIUM"},
+      {"component": "Trial messaging vs Test Store config", "issue": "UI advertises '7 days free' everywhere, but Test Store products have trial: null (P1W trial upsert also did not apply), so post-purchase alert says 'Subscription activated' instead of 'Your 7-day free trial has started'. Cosmetic on Test Store, but verify trial config before native release. Reference: /app/frontend/contexts/SubscriptionContext.tsx:185-190.", "testID": "", "priority": "LOW"},
+      {"component": "SubscriptionContext identity log", "issue": "Still prints '[RevenueCat] identity bound: $RCAnonymousID:...' (originalAppUserId), not the bound userId. Known from iter_26, still unfixed. Reference: /app/frontend/contexts/SubscriptionContext.tsx:91.", "testID": "", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Paywall pricing", "issue": "STILL UNRESOLVED: Test Store dashboard serves pro.monthly=$9.99 (999 micros) and pro.annual=$79.99 (7999 micros), trial: null — the re-upsert to $12.99/$89.99 with P1W trial did not take effect despite /products returning 200. Paywall UI correctly renders the live offering prices ($9.99/$79.99). Either re-run the upsert and verify with GET, or accept current prices.", "affected_testIDs": []},
+      {"flow": "/login screen for new emails", "issue": "Login screen shows 'Account Not Found — You will be taken to onboarding' for unregistered emails (by design — account creation happens via paywall auth gate). Noted as expected behavior, not a bug.", "affected_testIDs": []}
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "testID coverage", "issue": "Paywall CTAs (Start Free Trial, Confirm Free Trial, Restore Purchases, Continue with Email, Verify & Continue, Sign out) still lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx, /app/frontend/app/(tabs)/profile.tsx:731."},
+      {"component": "react-native-purchases-ui", "issue": "Declared in package.json but paywall is custom-built; unused dependency. Reference: /app/frontend/package.json."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screenshots/iter27_boot.jpeg",
+    "/app/test_reports/screenshots/iter27_after_onboarding.jpeg",
+    "/app/test_reports/screenshots/iter27_plan_step.jpeg",
+    "/app/test_reports/screenshots/iter27_checkout.jpeg",
+    "/app/test_reports/screenshots/iter27_teststore_modal.jpeg",
+    "/app/test_reports/screenshots/iter27_post_purchase.jpeg",
+    "/app/test_reports/screenshots/iter27_profile_plan.jpeg",
+    "/app/test_reports/screenshots/iter27_cold_reload.jpeg",
+    "/app/test_reports/screenshots/iter27b_monthly_step1.jpeg",
+    "/app/test_reports/screenshots/iter27b_post_purchase_nav.jpeg",
+    "/app/test_reports/screenshots/iter27c_restore_fresh.jpeg",
+    "/app/test_reports/screenshots/iter27c_owner_landing.jpeg",
+    "/app/test_reports/screenshots/iter27c_owner_profile.jpeg",
+    "/app/test_reports/screenshots/iter27c_owner_relogin.jpeg"
+  ],
+  "action_items": [
+    "PRICES (only open item, non-code): Test Store dashboard still serves $9.99/$79.99 with no trial. Re-run the products upsert (amount_micros 12990000/89990000, trial P1W) and verify via GET /rcbilling/v1/subscribers/<id>/products?id=pro.monthly&id=pro.annual, or accept current prices and update memory/docs.",
+    "Optional: sync onboarding hardcoded PLANS ($89.99/$12.99/$7.99 founding) with real offering prices (onboarding.tsx:614-618) — currently mismatched with checkout ($79.99/$9.99).",
+    "Optional: fix post-purchase URL staleness on web (router.replace renders tabs but leaves /subscription in address bar).",
+    "Cosmetic: fix '[RevenueCat] identity bound' log to print the bound userId (SubscriptionContext.tsx:91); add testID props to paywall/auth/sign-out controls; remove unused react-native-purchases-ui."
+  ],
+  "critical_code_review_comments": [
+    "revenuecat.tsx:42-56,104-107 — the useSyncExternalStore reactive identity fix is CORRECT and VERIFIED working end-to-end: rcLogIn sets currentAppUserId + notifies subscribers, provider re-renders, identityReady flips true, purchase choke-point passes, purchases-js modal opens on first Confirm tap (no retry needed, no 'Almost Ready').",
+    "Purchase choke-point (revenuecat.tsx:90) reads the live module flag — correct.",
+    "No post-purchase console errors observed; identify POST /v1/subscribers/identify fires exactly once per sign-in and again after sign-out/re-sign-in (rebind verified).",
+    "Entitlement persists across cold reload (anonymous RC id stable in browser storage + logIn rebind on session restore); buyer account reload lands on tabs Home.",
+    "Owner bypass still layered correctly: server GET /api/subscription subscribed:true -> Settings 'Hera Annual' + 'Hera Premium / Active'.",
+    "No deprecated expo-av / expo-barcode-scanner / expo-background-fetch usage in RevenueCat-touched files."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (8/8 flows: onboarding PASS, OTP login+identify PASS, annual purchase PASS, monthly purchase PASS, entitlement+settings plan PASS, cold-reload persistence PASS, restore-fresh PASS, owner bypass+rebind PASS)"},
+  "seed_data_creation": "Fresh accounts via OTP override (code 1234, /app/scripts/otp_override.py): test_rc2_buyer_1791140211@resend.dev (PURCHASED pro.annual $79.99 Test Store), test_rc2_nav_1791140457@resend.dev (PURCHASED pro.monthly $9.99 Test Store), test_rc2_restore_1791140602@resend.dev + test_rc2_restore_1791140689@resend.dev (no purchases, restore tested). delivered@resend.dev untouched. db.otp_log cleared per email.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Purchase flow fully working — Test Store modal: button:has-text('Test valid purchase'). OTP override helper: python3 /app/scripts/otp_override.py <email> (run AFTER OTP send; sha256('<email>:1234:'+JWT_SECRET), clears otp_log). Fresh accounts must sign in via /subscription auth gate ('Continue with Email') — /login rejects new emails with 'Account Not Found' (by design). Post-purchase, tabs render but URL stays /subscription (web quirk) — assert on content, not URL. Session reset: localStorage.clear() + hera_onboarded='\"true\"' + __hera_keys='[\"hera_onboarded\"]'. Sign-out on profile: click 'Sign out' then .last 'Sign out' in confirm dialog. Owner iaminamrana@gmail.com bypass works via OTP override. RC price check: curl -H 'Authorization: Bearer test_DVTXvbpqNHTxfpwfxYwOVtIgyNc' 'https://api.revenuecat.com/rcbilling/v1/subscribers/%24RCAnonymousID%3Ax/products?id=pro.monthly&id=pro.annual' (still 999/7999, trial null).",
+  "rca_of_issue": "CLOSED: iter_26 purchase block ('Almost Ready', modal never opens) is FIXED by the reactive identity change (useSyncExternalStore over module flag, notified by rcLogIn/rcLogOut). Verified: single Confirm Free Trial tap -> purchases-js Test Store modal -> successful test purchase -> entitlement 'pro' active -> tabs Home -> plan in Settings -> cold-reload persistence. OPEN (non-code): Test Store price re-upsert to $12.99/$89.99+P1W did not apply — dashboard still returns 999/7999 micros, trial:null (GET /rcbilling products API + paywall UI both confirm); POST /products returning 200 does not guarantee the price/trial change took effect — needs re-upsert with verification or acceptance of current prices."
+}

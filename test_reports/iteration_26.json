@@ -1,0 +1,58 @@
+{
+  "summary": "RETEST of iteration_25 RevenueCat identity fix (frontend-only, mobile viewport 390x844, public preview). CRITICAL STILL FAILING: purchase choke-point remains blocked — Confirm Free Trial shows 'Almost Ready / Preparing secure checkout' on every attempt (probed twice, 20s apart) and the purchases-js Test Store modal NEVER opens, even though POST /v1/subscribers/identify returns 201 and rcLogIn resolves. RCA of why the iter_25 fix didn't work: currentAppUserId is a MODULE-LEVEL flag; identityReady is computed in the useSubscriptionContext hook body, so mutating the flag does NOT re-render the provider. The fix's assumed re-render trigger ('logIn-triggered customer-info listener refreshes the query cache') does not produce a re-render on web — no post-logIn customer-info fetch/event is observed in console/network, and even if the listener fires, react-query structural sharing bails out because CustomerInfo is unchanged (originalAppUserId stays $RCAnonymousID, entitlements still {}). Result: identityReady stays false forever. PASS: onboarding->paywall, OTP login + identity bind (201), Restore on fresh account shows 'No Active Subscription' (retested in isolation — earlier fail was a test artifact), sign-out clears identity (fresh anonymous id, re-login rebinds — identify fired again), owner bypass (iaminamrana@gmail.com) lands on tabs with no purchase and Settings now shows server plan label 'Hera Annual' + 'Hera Premium — Active', non-premium signed-in account bounced from tabs to /subscription. PRICES: dashboard STILL returns pro.monthly=$9.99 (amount 999) and pro.annual=$79.99 (amount 7999) — verified via rcbilling products API and paywall UI; the re-upsert to $12.99/$89.99 did NOT apply (reported, not fixed, per instructions). Cold-reload entitlement persistence and post-purchase Settings plan label UNTESTED (blocked by the purchase bug).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "revenuecat.tsx identityReady (purchase choke-point)", "issue": "CRITICAL STILL BROKEN: purchases impossible. identityReady = currentAppUserId !== null is computed at render time from a module-level let; rcLogIn mutating it does not re-render RCSubscriptionProvider, and the expected logIn->listener->setQueryData->rerender chain never happens on web (no post-identify customer-info event; structural sharing would suppress it anyway since CustomerInfo is unchanged). Confirmed: identify 201 + '[RevenueCat] identity bound' logged, yet Confirm Free Trial shows Almost-Ready alert twice, 20s apart; zero purchase network calls fire. Reference: /app/frontend/src/lib/revenuecat.tsx:41-51,100; /app/frontend/contexts/SubscriptionContext.tsx:175-180.", "testID": "", "priority": "CRITICAL"},
+      {"component": "SubscriptionContext identity log", "issue": "Misleading log persists: '[RevenueCat] identity bound: $RCAnonymousID:...' prints originalAppUserId, which is NOT the bound id. Reference: /app/frontend/contexts/SubscriptionContext.tsx:91.", "testID": "", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Paywall purchase (Confirm Free Trial)", "issue": "Still never reaches the purchases-js Test Store modal (buttons 'Test valid purchase'/'Test failed purchase' never render). Blocked client-side by stale identityReady pre-check at SubscriptionContext.tsx:175. Entitlement activation, landing on /(tabs), cold-reload persistence, and post-purchase Settings plan all remain untestable.", "affected_testIDs": []},
+      {"flow": "Paywall pricing", "issue": "Test Store dashboard prices unchanged: pro.monthly=$9.99 (999 micros), pro.annual=$79.99 (7999 micros) per GET /rcbilling/v1/subscribers/<id>/products?id=pro.monthly&id=pro.annual. Expected $12.99/$89.99 after re-upsert — the upsert did not take effect. UI correctly renders the live offering prices.", "affected_testIDs": []},
+      {"flow": "Empty-offerings guard", "issue": "Step-1 CTA correctly replaced by 'Subscription options are unavailable right now' when statusLoaded && iapProducts.length===0 (subscription.tsx:220-223, code-verified; could not trigger live since offerings are non-empty). Step-2 checkout has NO equivalent empty-state guard — it would render fallback prices with a Confirm button that alerts 'Unavailable' via purchasePlan. Minor.", "affected_testIDs": []}
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "testID coverage", "issue": "Paywall CTAs (Start Free Trial, Confirm Free Trial, Restore Purchases, Continue with Email, Verify & Continue, Sign out) still lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx, /app/frontend/app/(tabs)/profile.tsx:732."},
+      {"component": "react-native-purchases-ui", "issue": "Declared in package.json:49 but paywall is custom-built; unused dependency. Reference: /app/frontend/package.json:49."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screenshots/iter26_boot.jpeg",
+    "/app/test_reports/screenshots/iter26_plan_step.jpeg",
+    "/app/test_reports/screenshots/iter26_checkout.jpeg",
+    "/app/test_reports/screenshots/iter26_after_confirm.jpeg",
+    "/app/test_reports/screenshots/iter26_probe_retry.jpeg",
+    "/app/test_reports/screenshots/iter26_restore_retest.jpeg",
+    "/app/test_reports/screenshots/iter26_bounce.jpeg",
+    "/app/test_reports/screenshots/iter26_owner_tabs.jpeg",
+    "/app/test_reports/screenshots/iter26_owner_profile.jpeg",
+    "/app/test_reports/screenshots/iter26_signed_out.jpeg",
+    "/app/test_reports/screenshots/iter26_resigned.jpeg"
+  ],
+  "action_items": [
+    "CRITICAL FIX (root cause identified): make RC identity REACTIVE instead of a render-time read of a module flag. In /app/frontend/src/lib/revenuecat.tsx keep currentAppUserId but add a tiny subscription mechanism and drive identityReady with useSyncExternalStore (or a useState in the provider set by rcLogIn/rcLogOut wrappers), e.g.: const idSubs=new Set(); rcLogIn sets currentAppUserId then idSubs.forEach(cb=>cb()); in useSubscriptionContext: const identityReady = useSyncExternalStore(cb=>{idSubs.add(cb);return()=>idSubs.delete(cb)}, ()=>currentAppUserId!==null). The purchaseMutation choke-point reading the module flag directly (line 85) is already correct — only the render-time identityReady (line 100) is stale.",
+    "After the fix, re-run the full purchase flow: Confirm Free Trial -> purchases-js modal 'Test valid purchase' -> entitlement 'pro' -> land on /(tabs) -> cold-reload persistence -> Settings plan label.",
+    "Prices: the re-upsert did not apply — dashboard still serves $9.99/$79.99. Re-run POST /products with amount_micros 1299/8999 via the integration proxy and verify with GET /rcbilling/v1/subscribers/<id>/products?id=pro.monthly&id=pro.annual (or accept current prices and update memory).",
+    "Cosmetic: fix '[RevenueCat] identity bound' log to print the bound userId, not originalAppUserId (SubscriptionContext.tsx:91).",
+    "Optional: add testID props to paywall/auth/sign-out controls; remove unused react-native-purchases-ui; add empty-offerings guard to checkout step 2."
+  ],
+  "critical_code_review_comments": [
+    "revenuecat.tsx:41/100 — the fix's core flaw: module-level mutable state read during render is invisible to React. The comment on lines 98-99 documents the intended re-render path, but it does not occur (verified empirically).",
+    "Module duplication ruled out: _layout.tsx, SubscriptionContext.tsx both import '@/src/lib/revenuecat' (single Metro instance), so the mutation-time choke (line 85) would pass once identityReady becomes reactive.",
+    "No RC purchase network calls fire on Confirm Free Trial — proves the block is the pre-check at SubscriptionContext.tsx:175, not the store.",
+    "Owner bypass layered correctly: server GET /api/subscription subscribed:true -> Settings shows 'Hera Annual' (serverPlan) and 'Hera Premium — Active' (iter26_owner_profile.jpeg).",
+    "Restore flow verified working: 'No Active Subscription' alert on a fresh signed-in account (iter26_restore_retest.jpeg).",
+    "No deprecated expo-av / expo-barcode-scanner / expo-background-fetch usage in the RevenueCat-touched files."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "71% (5/7 flows: onboarding PASS, login+identify PASS, restore PASS, sign-out+rebind PASS, owner-bypass+server-plan-label PASS, gating PASS; purchase CRITICAL FAIL; cold-reload persistence + post-purchase settings untestable)"},
+  "seed_data_creation": "Fresh non-premium accounts via OTP override (code 1234): test_rc_buyer_<ts>@resend.dev, test_rc_probe_<ts>@resend.dev, test_rc_restore_<ts>@resend.dev — no purchases (blocked). delivered@resend.dev untouched. db.otp_log cleared for rate limits.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Purchase STILL blocked (see RCA). Once fixed, the purchases-js Test Store modal renders plain <button> elements in-document: click button:has-text('Test valid purchase'). Onboarding click-through loop (Skip/Continue/fill placeholders 'Your name...' etc., 'No' + 'Generate My Profile' on q20) works as-is. OTP override mid-session via subprocess mongosh works (sha256('<email>:1234:'+JWT_SECRET), emails lowercased, clear db.otp_log first). Owner Settings shows 'Hera Annual' + 'Hera Premium — Active'. Sign-out confirm dialog has two 'Sign out' texts — click .last. To reset session without losing onboarding: localStorage.clear() then set hera_onboarded='\"true\"' and __hera_keys='[\"hera_onboarded\"]'. RC price check: curl -H 'Authorization: Bearer test_DVTXvbpqNHTxfpwfxYwOVtIgyNc' 'https://api.revenuecat.com/rcbilling/v1/subscribers/$RCAnonymousID:x/products?id=pro.monthly&id=pro.annual'.",
+  "rca_of_issue": "BUG (STILL OPEN after iter_25 fix): Confirm Free Trial always shows 'Almost Ready — Preparing secure checkout'; Test Store modal never opens. Reproduction: fresh account -> onboarding -> /subscription -> OTP sign-in (identify POST 201, '[RevenueCat] identity bound' logged) -> plan step -> Start Free Trial -> Confirm Free Trial (retried after 20s) -> alert every time; zero purchase network calls. RCA: iter_25 fix moved identity tracking to module-level `let currentAppUserId` set by rcLogIn, but `identityReady = currentAppUserId !== null` (revenuecat.tsx:100) is evaluated during render of useSubscriptionContext. Mutating a module variable does not schedule a React re-render, and the fix's assumed trigger — logIn firing the customer-info listener which setQueryData's the cache — does not produce one on web (no post-identify customer-info fetch/event observed in console or network; additionally react-query structural sharing would bail out because the refreshed CustomerInfo is structurally identical: originalAppUserId stays $RCAnonymousID and entitlements are still empty). So identityReady remains the stale `false` captured at mount and purchasePlan's pre-check (SubscriptionContext.tsx:175) blocks every purchase before any RC call. Mitigation: make identity reactive — useSyncExternalStore over the module flag (notify in rcLogIn/rcLogOut), or lift identity state into the provider via useState; the mutation-time choke reading the live module var (revenuecat.tsx:85) is already correct. Same flaw blocks native builds where configure() precedes logIn()."
+}

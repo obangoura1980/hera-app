@@ -52,7 +52,7 @@ function TrialSummaryStep({
 }) {
   const insets = useSafeAreaInsets();
   const { isDark, colors: c } = useTheme();
-  const { iapProducts, restoreSubscription, isLoading } = useSubscription();
+  const { iapProducts, restoreSubscription, isLoading, statusLoaded } = useSubscription();
   const { user: authUser } = useAuth();
 
   const monthlyProduct = useMemo(() => iapProducts.find(p => p.productId === IAP_SKUS.monthly), [iapProducts]);
@@ -217,6 +217,11 @@ function TrialSummaryStep({
           pointerEvents="none"
         />
         <View style={ts.ctaInner}>
+          {statusLoaded && iapProducts.length === 0 ? (
+            <Text style={[ts.ctaSub, { color: bodyColor, textAlign: 'center' }]}>
+              Subscription options are unavailable right now. Please try again later.
+            </Text>
+          ) : (
           <Pressable
             onPress={onNext}
             style={({ pressed }) => [{ borderRadius: Radius.xxl, overflow: 'hidden' }, pressed && { opacity: 0.85 }]}
@@ -226,6 +231,7 @@ function TrialSummaryStep({
               <Text style={ts.ctaTxt}>{ctaLabel}</Text>
             </LinearGradient>
           </Pressable>
+          )}
           <Text style={[ts.ctaSub, { color: isDark ? 'rgba(192,132,252,0.55)' : 'rgba(74,40,50,0.55)' }]}>
             $0.00 today · Confirmation via App Store
           </Text>
@@ -284,7 +290,7 @@ function CheckoutBreakdownStep({
 }) {
   const insets = useSafeAreaInsets();
   const { isDark, colors: c } = useTheme();
-  const { iapProducts, restoreSubscription, isLoading } = useSubscription();
+  const { iapProducts, restoreSubscription, isLoading, statusLoaded } = useSubscription();
   const { user: authUser } = useAuth();
 
   const monthlyProduct = useMemo(() => iapProducts.find(p => p.productId === IAP_SKUS.monthly), [iapProducts]);

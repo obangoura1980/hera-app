@@ -1,40 +1,23 @@
-import { api } from '@/src/api';
-import { router as expoRouter } from 'expo-router';
-
-const DEMO_CHECKOUT = true;
 /**
  * SubscriptionContext.tsx
- * Global subscription state for Hera — powered by native Apple IAP (StoreKit).
- * All purchases go through Apple In-App Purchases (com.hera.app.premium.monthly / .yearly).
- * Stripe has been fully removed. Subscription management is via App Store Settings.
+ * Global subscription state for Hera — backed by RevenueCat (App Store / Play
+ * Store billing; Test Store in Expo Go / web preview).
+ * Source of truth: customerInfo.entitlements.active['pro'] via src/lib/revenuecat.
+ * A server-side owner allowlist (GET /api/subscription) is honored on top so the
+ * app owner account stays premium without a store purchase.
  */
 import React, {
   createContext, useState, useCallback, useEffect, useRef, ReactNode,
 } from 'react';
-import AsyncStorage from '@/src/utils/async-storage';
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import { router } from 'expo-router';
+import Purchases from 'react-native-purchases';
+import AsyncStorage from '@/src/utils/async-storage';
 import { useAuth, useAlert } from '@/template';
-import {
-  connectIAP,
-  disconnectIAP,
-  fetchIAPProducts,
-  purchaseSubscription,
-  restorePurchases,
-  validateReceiptWithServer,
-  loadCachedIAPStatus,
-  clearCachedIAPStatus,
-  finishTransaction,
-  purchaseUpdatedListener,
-  purchaseErrorListener,
-  IAP_SKUS,
-  mapProductToKey,
-  type IAPSubscription,
-  type SubscriptionPurchase,
-  type PurchaseError,
-  type IAPStatus,
-} from '@/services/iapService';
+import { api } from '@/src/api';
+import { useRCSubscription, rcEnabled, rcLogIn, rcLogOut, REVENUECAT_ENTITLEMENT_IDENTIFIER } from '@/src/lib/revenuecat';
 import { PaywallModal } from '@/components/feature/PaywallModal';
+import type { IAPSubscription } from '@/services/iapService';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -82,150 +65,86 @@ export const SubscriptionContext = createContext<SubscriptionContextType | undef
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user: authUser } = useAuth();
   const { showAlert } = useAlert();
+  const rc = useRCSubscription();
 
-  const [isLoading,       setIsLoading]      = useState(false);
-  const [isPurchasing,    setIsPurchasing]    = useState(false);
-  const [isSubscribed,    setIsSubscribed]    = useState(false);
-  const [isTrial,         setIsTrial]         = useState(false);
-  const [plan,            setPlan]            = useState<Plan>('free');
-  const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
+  const [isLoading,       setIsLoading]       = useState(false);
+  const [serverBypass,    setServerBypass]    = useState(false); // owner allowlist
+  const [serverPlan,      setServerPlan]      = useState<Plan>('yearly');
+  const [bypassChecked,   setBypassChecked]   = useState(false);
   const [dailyChatCount,  setDailyChatCount]  = useState(0);
   const [paywallVisible,  setPaywallVisible]  = useState(false);
   const [paywallFeature,  setPaywallFeature]  = useState('AI Feature');
-  const [iapProducts,     setIapProducts]     = useState<IAPSubscription[]>([]);
-  const [iapReady,        setIapReady]        = useState(false);
-  // True once the first subscription check has completed — guards must not
-  // redirect anyone until the real status is known.
-  const [statusLoaded,    setStatusLoaded]    = useState(false);
-  const safetyTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Prevents safety timer from showing "timed out" if the purchase listener already handled it
-  const purchaseHandledRef = useRef(false);
+  const [purchaseIdentityError, setPurchaseIdentityError] = useState<string | null>(null);
+  const rcIdentityRef = useRef<string | null>(null);
 
   const authUserId = authUser?.id;
 
-  // ── Apply IAP status to context state ──────────────────────────────────────
-  const applyIAPStatus = useCallback((status: IAPStatus) => {
-    setIsSubscribed(status.isSubscribed);
-    setIsTrial(status.isTrial);
-    setPlan(status.plan);
-    setSubscriptionEnd(status.expiresAt);
-  }, []);
-
-  // ── Initialize IAP connection ───────────────────────────────────────────────
+  // ── RevenueCat identity — COMPULSORY before any purchase ───────────────────
   useEffect(() => {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
-
-    let mounted = true;
-    connectIAP().then(async (ok) => {
-      if (!mounted) return;
-      if (!ok) {
-        // Expected while demo checkout is active (store stub) — only warn once real IAP is enabled
-        if (!DEMO_CHECKOUT) console.warn('[IAP] connectIAP returned false — store unavailable on this platform');
-        return;
-      }
-      setIapReady(true);
-
-      // Load cached status immediately so UI is correct while we re-validate
-      const cached = await loadCachedIAPStatus();
-      if (mounted) applyIAPStatus(cached);
-
-      // Fetch product metadata (titles, prices) from the store.
-      // Retry once after 3 s if first fetch returns empty — common on first cold launch
-      // or when the StoreKit product list hasn't propagated from App Store Connect yet.
-      let products = await fetchIAPProducts();
-      if (products.length === 0) {
-        await new Promise(r => setTimeout(r, 3000));
-        products = await fetchIAPProducts();
-      }
-      if (mounted) setIapProducts(products);
-    });
-
-    return () => {
-      mounted = false;
-      disconnectIAP();
-    };
-  }, [applyIAPStatus]);
-
-  // ── Purchase & error listeners ──────────────────────────────────────────────
-  // Attached immediately at mount (not gated on iapReady) so we never miss an event
-  // delivered by StoreKit before the iapReady flag flips — especially important on iPad.
-  useEffect(() => {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
-
-    const purchaseSub = purchaseUpdatedListener(async (purchase: SubscriptionPurchase) => {
-      // Mark handled so safety timer doesn't fire after us
-      purchaseHandledRef.current = true;
-      if (safetyTimerRef.current) { clearTimeout(safetyTimerRef.current); safetyTimerRef.current = null; }
-
-      const receipt = Platform.OS === 'ios'
-        ? ((purchase as any).transactionReceipt as string | undefined)
-        : (purchase.purchaseToken as string | undefined);
-
-      if (!receipt) {
-        // StoreKit delivered a purchase event with no receipt — finish to unblock queue
-        console.warn('[IAP] purchaseUpdatedListener: empty receipt — finishing transaction to unblock queue');
-        await finishTransaction({ purchase, isConsumable: false }).catch(() => {});
-        setIsPurchasing(false);
-        return;
-      }
-
+    if (!rcEnabled) return;
+    (async () => {
       try {
-        setIsPurchasing(true);
-        const status = await validateReceiptWithServer(
-          receipt,
-          purchase.productId,
-          Platform.OS === 'ios' ? 'ios' : 'android',
-        );
-        applyIAPStatus(status);
-
-        // Always finish the transaction BEFORE navigating away so StoreKit doesn't re-deliver it.
-        await finishTransaction({ purchase, isConsumable: false });
-
-        if (status.isSubscribed) {
-          showAlert(
-            'Welcome to Hera Premium! \uD83C\uDF1F',
-            status.isTrial
-              ? 'Your 7-day free trial has started. Enjoy unlimited access!'
-              : 'Subscription activated. Enjoy unlimited access!',
-          );
-          router.replace('/(tabs)');
-        } else {
-          showAlert(
-            'Verification Pending',
-            'Your purchase was received but subscription status is still pending. Please restore purchases in a moment.',
-          );
+        if (authUserId && rcIdentityRef.current !== authUserId) {
+          const { customerInfo } = await rcLogIn(authUserId);
+          rcIdentityRef.current = authUserId;
+          setPurchaseIdentityError(null);
+          console.log('[RevenueCat] identity bound:', customerInfo.originalAppUserId);
+        } else if (!authUserId && rcIdentityRef.current) {
+          await rcLogOut();
+          rcIdentityRef.current = null;
         }
-      } catch (e: any) {
-        // Even on error, finish the transaction so StoreKit doesn't hang
-        await finishTransaction({ purchase, isConsumable: false }).catch(() => {});
-        showAlert('Purchase Error', e.message || 'Could not verify your purchase. Please restore purchases or contact support.');
-      } finally {
-        setIsPurchasing(false);
+      } catch (e) {
+        // NEVER swallow — an anonymous purchase cannot be mapped to the user.
+        setPurchaseIdentityError(String(e));
       }
-    });
+    })();
+  }, [authUserId]);
 
-    const errorSub = purchaseErrorListener((error: PurchaseError) => {
-      purchaseHandledRef.current = true;
-      if (safetyTimerRef.current) { clearTimeout(safetyTimerRef.current); safetyTimerRef.current = null; }
-      setIsPurchasing(false);
+  // ── Owner allowlist (backend whitelist — not a purchase path) ───────────────
+  const checkServerBypass = useCallback(async (): Promise<boolean> => {
+    if (!authUserId) { setServerBypass(false); setBypassChecked(true); return false; }
+    try {
+      const data: any = await api('/subscription');
+      const ok = !!data?.subscribed;
+      setServerBypass(ok);
+      if (ok) setServerPlan(data.plan === 'monthly' ? 'monthly' : 'yearly');
+      return ok;
+    } catch {
+      return false;
+    } finally {
+      setBypassChecked(true);
+    }
+  }, [authUserId]);
 
-      const code = String((error as any).code ?? '');
-      if (code !== 'E_USER_CANCELLED') {
-        const isNotFound = code === 'E_ITEM_UNAVAILABLE' || code === 'E_PRODUCT_NOT_FOUND';
-        showAlert(
-          isNotFound ? 'Product Unavailable' : 'Purchase Failed',
-          isNotFound
-            ? 'This subscription is not available in the App Store yet. Please ensure the IAP products are approved in App Store Connect and try again.'
-            : (error.message || 'The purchase could not be completed. Please try again.'),
-        );
-      }
-    });
+  useEffect(() => { checkServerBypass(); }, [checkServerBypass]);
 
-    return () => {
-      purchaseSub.remove();
-      errorSub.remove();
-    };
-  }, [applyIAPStatus, showAlert]);
+  // ── Derived entitlement state ───────────────────────────────────────────────
+  const entitlement = rc.customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER];
+  const rcSubscribed = !!entitlement;
+  const isSubscribed = rcSubscribed || serverBypass;
+  const isTrial = entitlement?.periodType === 'trial';
+  const subscriptionEnd = entitlement?.expirationDate ?? null;
+
+  const packages = rc.offerings?.current?.availablePackages ?? [];
+  const plan: Plan = (() => {
+    if (!isSubscribed) return 'free';
+    const match = packages.find(p => p.product.identifier === entitlement?.productIdentifier);
+    if (match?.packageType === 'ANNUAL') return 'yearly';
+    if (match?.packageType === 'MONTHLY') return 'monthly';
+    return serverBypass && !rcSubscribed ? serverPlan : 'monthly';
+  })();
+
+  // Offerings → legacy product shape consumed by the paywall UI
+  // (productId carries the RC package identifier, matched via IAP_SKUS)
+  const iapProducts: IAPSubscription[] = packages.map(pkg => ({
+    productId: pkg.identifier,
+    title: pkg.product.title,
+    description: pkg.product.description,
+    localizedPrice: pkg.product.priceString,
+    currency: pkg.product.currencyCode,
+  }));
+
+  const statusLoaded = bypassChecked && !rc.isLoading;
 
   // ── Load persisted daily chat count ────────────────────────────────────────
   useEffect(() => {
@@ -240,220 +159,80 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // ── Check subscription (re-validate with server) ────────────────────────────
+  // ── Re-check (pull-to-refresh / app-foreground) ─────────────────────────────
   const checkSubscription = useCallback(async () => {
-    // For iOS / Android: restore purchases from StoreKit and validate latest receipt
-    if ((Platform.OS === 'ios' || Platform.OS === 'android') && iapReady) {
-      setIsLoading(true);
-      try {
-        const available = await restorePurchases();
-        if (available.length > 0) {
-          const latest = available[available.length - 1];
-          const receipt = Platform.OS === 'ios'
-            ? (latest as any).transactionReceipt
-            : latest.purchaseToken;
-          if (receipt) {
-            const status = await validateReceiptWithServer(receipt, latest.productId, Platform.OS === 'ios' ? 'ios' : 'android');
-            applyIAPStatus(status);
-            return;
-          }
-        }
-        // No active IAP receipt — fall back to server check (covers test-email allowlist)
-        if (authUserId) {
-          try {
-            const { getSupabaseClient } = await import('@/template');
-            const supabase = getSupabaseClient();
-            const { data } = await supabase.functions.invoke('check-subscription');
-            if (data?.subscribed) {
-              applyIAPStatus({
-                isSubscribed: true,
-                isTrial: data.is_trial ?? false,
-                plan: data.plan === 'annual' || data.plan === 'yearly' ? 'yearly' : 'monthly',
-                expiresAt: data.subscription_end ?? null,
-                validatedAt: new Date().toISOString(),
-              });
-              return;
-            }
-          } catch {}
-        }
-        applyIAPStatus({ isSubscribed: false, isTrial: false, plan: 'free', expiresAt: null, validatedAt: new Date().toISOString() });
-      } catch {
-        // Silent — keep cached state
-      } finally {
-        setIsLoading(false);
-        setStatusLoaded(true);
-      }
-      return;
-    }
+    await Promise.allSettled([rc.refetchCustomerInfo(), checkServerBypass()]);
+  }, [rc, checkServerBypass]);
 
-    // Fallback for test accounts / non-mobile: check via check-subscription edge function
-    if (!authUserId) {
-      applyIAPStatus({ isSubscribed: false, isTrial: false, plan: 'free', expiresAt: null, validatedAt: new Date().toISOString() });
-      setStatusLoaded(true);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const { getSupabaseClient } = await import('@/template');
-      const supabase = getSupabaseClient();
-      const { data } = await supabase.functions.invoke('check-subscription');
-      if (data?.subscribed) {
-        setIsSubscribed(true);
-        setIsTrial(data.is_trial ?? false);
-        setPlan(data.plan === 'annual' || data.plan === 'yearly' ? 'yearly' : 'monthly');
-        setSubscriptionEnd(data.subscription_end ?? null);
-      }
-    } catch {}
-    finally { setIsLoading(false); setStatusLoaded(true); }
-  }, [iapReady, authUserId, applyIAPStatus]);
-
-  // Auto-check on mount / IAP ready / auth change — runs on every platform;
-  // checkSubscription falls back to the server when StoreKit isn't available.
-  useEffect(() => {
-    checkSubscription();
-  }, [iapReady, authUserId, checkSubscription]);
-
-  // ── Purchase a plan (native StoreKit only) ──────────────────────────────────
+  // ── Purchase a plan ─────────────────────────────────────────────────────────
   const purchasePlan = useCallback(async (productKey: 'monthly' | 'yearly') => {
-    // Emergent preview: no App Store / Play Store products are connected yet, so the
-    // free trial is activated through the backend (demo — no payment is taken).
-    if (DEMO_CHECKOUT) {
-      try {
-        setIsPurchasing(true);
-        const res: any = await api('/premium/activate', { method: 'POST' });
-        if (!res?.is_premium) throw new Error('Activation was not confirmed');
-        // Reflect the activated trial immediately so the tabs guard lets the user in
-        applyIAPStatus({ isSubscribed: true, isTrial: true, plan: productKey, expiresAt: null, validatedAt: new Date().toISOString() });
-        await checkSubscription();
-        // Drop onboarding/sign-in from the back stack so Home is the root
-        if (expoRouter.canDismiss()) expoRouter.dismissAll();
-        expoRouter.replace('/(tabs)');
-      } catch {
-        showAlert('Something went wrong', 'Your trial could not be started. Please check your connection and try again — you have not been charged.');
-      } finally {
-        setIsPurchasing(false);
-      }
+    const identifier = productKey === 'yearly' ? '$rc_annual' : '$rc_monthly';
+    const pkg = (rc.offerings?.current?.availablePackages ?? []).find(p => p.identifier === identifier);
+    if (!pkg) {
+      showAlert('Unavailable', 'Subscription options are unavailable right now. Please try again later.');
       return;
     }
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      showAlert(
-        'Available on Device',
-        'In-App Purchases are only available on the iOS or Android app. Please install Hera from the App Store to subscribe.',
-      );
+    if (!rc.identityReady) {
+      showAlert('Almost Ready', purchaseIdentityError
+        ? 'We could not prepare secure checkout. Please check your connection and try again.'
+        : 'Preparing secure checkout — please try again in a moment.');
       return;
     }
-
-    if (!iapReady) {
-      showAlert('Store Unavailable', 'The App Store is not ready yet. Please wait a moment and try again.');
-      return;
-    }
-
-    // Guard: warn if no products loaded from App Store Connect
-    if (iapProducts.length === 0) {
-      showAlert(
-        'Store Not Ready',
-        'Subscription products could not be loaded from the App Store. Please check your internet connection and try again. If the issue persists, ensure the IAP products are active in App Store Connect.',
-      );
-      return;
-    }
-
-    const sku = productKey === 'yearly' ? IAP_SKUS.yearly : IAP_SKUS.monthly;
-
-    // Guard: warn if this specific SKU wasn't returned by the store
-    const productExists = iapProducts.some(p => p.productId === sku);
-    if (!productExists) {
-      showAlert(
-        'Product Not Found',
-        `The ${productKey} subscription (${sku}) was not found in the App Store. Please verify the product ID is active and approved in App Store Connect.`,
-      );
-      return;
-    }
-
-    // Reset handled flag before new purchase attempt
-    purchaseHandledRef.current = false;
-    setIsPurchasing(true);
-
-    // Safety timeout — fires only if StoreKit never delivers a listener event
-    safetyTimerRef.current = setTimeout(() => {
-      safetyTimerRef.current = null;
-      if (!purchaseHandledRef.current) {
-        setIsPurchasing(false);
-        showAlert(
-          'Purchase Timed Out',
-          'The App Store did not respond. Please verify your In-App Purchase products are active in App Store Connect and that your Paid Apps Agreement is signed, then try again.',
-        );
-      }
-    }, 60_000);
-
     try {
-      await purchaseSubscription(sku, authUserId);
-      // Completion arrives asynchronously via purchaseUpdatedListener.
+      const customerInfo = await rc.purchase(pkg);
+      const active = !!customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER];
+      if (!active) return; // listener will update state; no nav until entitlement is live
+      showAlert(
+        'Welcome to Hera Premium! 🌟',
+        customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_IDENTIFIER]?.periodType === 'trial'
+          ? 'Your 7-day free trial has started. Enjoy unlimited access!'
+          : 'Subscription activated. Enjoy unlimited access!',
+      );
+      // Drop onboarding/sign-in from the back stack so Home is the root
+      if (router.canDismiss()) router.dismissAll();
+      router.replace('/(tabs)');
     } catch (e: any) {
-      if (safetyTimerRef.current) { clearTimeout(safetyTimerRef.current); safetyTimerRef.current = null; }
-      setIsPurchasing(false);
-      const code = String((e as any).code ?? '');
-      if (code !== 'E_USER_CANCELLED') {
-        showAlert('Purchase Error', e.message || 'Could not start purchase. Please try again.');
+      if (e?.userCancelled) return; // user dismissed the sheet — stay silent
+      if (e?.message === 'identity_not_ready') {
+        showAlert('Almost Ready', 'Preparing secure checkout — please try again in a moment.');
+        return;
       }
+      showAlert('Purchase Error', e?.message || 'The purchase could not be completed. Please try again.');
     }
-  }, [iapReady, iapProducts, authUserId, showAlert]);
+  }, [rc, showAlert, purchaseIdentityError]);
 
-  // ── Restore purchases ───────────────────────────────────────────────────────
+  // ── Restore purchases (Apple requires this entry point) ─────────────────────
   const restoreSubscription = useCallback(async () => {
     setIsLoading(true);
-    let restored = false;
     try {
-      // On iOS/Android: try to restore via StoreKit directly
-      if ((Platform.OS === 'ios' || Platform.OS === 'android') && iapReady) {
-        const available = await restorePurchases();
-        if (available.length > 0) {
-          const latest = available[available.length - 1];
-          const receipt = Platform.OS === 'ios'
-            ? (latest as any).transactionReceipt
-            : latest.purchaseToken;
-          if (receipt) {
-            const status = await validateReceiptWithServer(receipt, latest.productId, Platform.OS === 'ios' ? 'ios' : 'android');
-            applyIAPStatus(status);
-            restored = status.isSubscribed;
-          }
-        }
-      } else if (authUserId) {
-        // Fallback: server check (covers test-email allowlist on web/simulator)
-        const { getSupabaseClient } = await import('@/template');
-        const supabase = getSupabaseClient();
-        const { data } = await supabase.functions.invoke('check-subscription');
-        if (data?.subscribed) {
-          applyIAPStatus({
-            isSubscribed: true,
-            isTrial: data.is_trial ?? false,
-            plan: data.plan === 'annual' || data.plan === 'yearly' ? 'yearly' : 'monthly',
-            expiresAt: data.subscription_end ?? null,
-            validatedAt: new Date().toISOString(),
-          });
-          restored = true;
-        }
+      let active = false;
+      if (rcEnabled) {
+        const info = await rc.restore();
+        active = !!info?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER];
       }
-
-      if (restored) {
+      const bypass = await checkServerBypass();
+      if (active || bypass) {
         showAlert('Subscription Restored', 'Your Hera Premium subscription has been restored!');
+        if (router.canDismiss()) router.dismissAll();
         router.replace('/(tabs)');
       } else {
-        showAlert('No Active Subscription', 'No active subscription was found for your Apple ID.');
+        showAlert('No Active Subscription', 'No active subscription was found for this account.');
       }
     } catch (e: any) {
-      showAlert('Restore Failed', e.message || 'Could not restore purchases. Please try again.');
+      showAlert('Restore Failed', e?.message || 'Could not restore purchases. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [iapReady, authUserId, applyIAPStatus, showAlert]);
+  }, [rc, checkServerBypass, showAlert]);
 
-  // ── Manage subscription via App Store Settings ──────────────────────────────
+  // ── Manage subscription via store settings ──────────────────────────────────
   const openPortal = useCallback(async () => {
     try {
-      const { Linking } = await import('react-native');
-      await Linking.openURL('https://apps.apple.com/account/subscriptions');
+      await Linking.openURL(Platform.OS === 'android'
+        ? 'https://play.google.com/store/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions');
     } catch {
-      showAlert('Unable to Open', 'Please go to Settings > Apple ID > Subscriptions to manage your Hera subscription.');
+      showAlert('Unable to Open', 'Please manage your Hera subscription in your App Store / Play Store account settings.');
     }
   }, [showAlert]);
 
@@ -481,7 +260,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   return (
     <SubscriptionContext.Provider value={{
       isLoading,
-      isPurchasing,
+      isPurchasing: rc.isPurchasing,
       isSubscribed,
       isTrial,
       plan,

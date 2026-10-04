@@ -10,9 +10,10 @@ import { FunctionsHttpError } from '@/template/core/supabase-types';
 
 // ── Product IDs ───────────────────────────────────────────────────────────────
 
+// RevenueCat package identifiers (offerings.current.availablePackages[].identifier)
 export const IAP_SKUS = {
-  monthly: 'com.hera.app.premium.monthly',
-  yearly:  'com.hera.app.premium.yearly',
+  monthly: '$rc_monthly',
+  yearly:  '$rc_annual',
 } as const;
 
 export type IAPProductKey = keyof typeof IAP_SKUS;
