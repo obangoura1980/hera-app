@@ -1,192 +1,94 @@
 // @ts-nocheck
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Platform, Alert } from 'react-native';
+/**
+ * AlertProvider — app-wide themed alert modal (replaces the native Android/iOS
+ * system dialogs). Same showAlert(title, message, buttons) API everywhere.
+ */
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 import { AlertButton, AlertState } from './types';
+import { useTheme } from '@/hooks/useTheme';
 
-// Context type definition
 interface AlertContextType {
   showAlert: (title: string, message?: string, buttons?: AlertButton[]) => void;
 }
 
-// Create Context
 const AlertContext = createContext<AlertContextType | undefined>(undefined);
 
-// AlertProvider - unified platform handling
-interface AlertProviderProps {
-  children: ReactNode;
-}
+export function AlertProvider({ children }: { children: ReactNode }) {
+  const [alertState, setAlertState] = useState<AlertState>({ visible: false, title: '', message: '', buttons: [] });
 
-export function AlertProvider({ children }: AlertProviderProps) {
-  const [alertState, setAlertState] = useState<AlertState>({
-    visible: false,
-    title: '',
-    message: '',
-    buttons: []
-  });
+  const showAlert = useCallback((title: string, message?: string, buttons?: AlertButton[]) => {
+    setAlertState({
+      visible: true,
+      title,
+      message: message || '',
+      buttons: buttons?.length ? buttons : [{ text: 'OK', onPress: () => {} }],
+    });
+  }, []);
 
-  const showAlert = (
-    title: string,
-    message?: string,
-    buttons?: AlertButton[]
-  ) => {
-    // Parameter normalization
-    const normalizedMessage = message || '';
-    const normalizedButtons = buttons?.length ? buttons : [{ 
-      text: 'OK',
-      onPress: () => {}
-    }];
+  const hideAlert = useCallback(() => setAlertState(prev => ({ ...prev, visible: false })), []);
 
-    if (Platform.OS === 'web') {
-      // Web: Use internal modal
-      setAlertState({
-        visible: true,
-        title,
-        message: normalizedMessage,
-        buttons: normalizedButtons
-      });
-    } else {
-      // Mobile: Use native Alert.alert
-      const alertButtons = normalizedButtons.map(button => ({
-        text: button.text,
-        onPress: button.onPress,
-        style: button.style
-      }));
-      
-      Alert.alert(title, normalizedMessage, alertButtons);
-    }
-  };
-
-  const hideAlert = () => {
-    setAlertState(prev => ({ ...prev, visible: false }));
-  };
-
-  const handleButtonPress = (button: AlertButton) => {
+  const handleButtonPress = useCallback((button: AlertButton) => {
+    hideAlert();
     try {
-      
-      if (typeof button.onPress === 'function') {
-        button.onPress();
-      }
-      
-      hideAlert();
+      if (typeof button.onPress === 'function') button.onPress();
     } catch (error) {
-      console.warn('[Template:AlertProvider] Button press error:', error);
-      hideAlert();
+      console.warn('[AlertProvider] Button press error:', error);
     }
-  };
-
-  const contextValue: AlertContextType = {
-    showAlert
-  };
+  }, [hideAlert]);
 
   return (
-    <AlertContext.Provider value={contextValue}>
+    <AlertContext.Provider value={{ showAlert }}>
       {children}
-      {Platform.OS === 'web' && (
-        <WebAlertModal
-          alertState={alertState}
-          onButtonPress={handleButtonPress}
-          onHide={hideAlert}
-        />
-      )}
+      <ThemedAlertModal alertState={alertState} onButtonPress={handleButtonPress} onHide={hideAlert} />
     </AlertContext.Provider>
   );
 }
 
-// useAlertContext Hook - internal use
 export function useAlertContext(): AlertContextType {
   const context = useContext(AlertContext);
-  
-  if (context === undefined) {
-    throw new Error('useAlertContext must be used within an AlertProvider');
-  }
-  
+  if (context === undefined) throw new Error('useAlertContext must be used within an AlertProvider');
   return context;
 }
 
-// Internal Web Alert Modal Component
-import {
-  Modal,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+function ThemedAlertModal({ alertState, onButtonPress, onHide }: {
+  alertState: AlertState; onButtonPress: (b: AlertButton) => void; onHide: () => void;
+}) {
+  const { colors: c, isDark } = useTheme();
+  if (!alertState.visible) return null;
 
-interface WebAlertModalProps {
-  alertState: AlertState;
-  onButtonPress: (button: AlertButton) => void;
-  onHide: () => void;
-}
-
-function WebAlertModal({ alertState, onButtonPress, onHide }: WebAlertModalProps) {
-  if (!alertState.visible) {
-    return null;
-  }
-
-  // Determine button style
-  const getButtonStyle = (button: AlertButton, index: number) => {
-    const isLast = index === alertState.buttons.length - 1;
-    const baseStyle = [styles.button];
-    
-    if (alertState.buttons.length > 1 && !isLast) {
-      baseStyle.push(styles.buttonWithBorder);
-    }
-    
-    return baseStyle;
-  };
-
-  // Determine button text style
-  const getButtonTextStyle = (button: AlertButton) => {
-    switch (button.style) {
-      case 'cancel':
-        return styles.cancelButtonText;
-      case 'destructive':
-        return styles.destructiveButtonText;
-      default:
-        return styles.defaultButtonText;
-    }
-  };
+  const cancelBtn = alertState.buttons.find(b => b.style === 'cancel');
+  const stacked = alertState.buttons.length > 2;
 
   return (
-    <Modal visible={alertState.visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.content}>
-            <Text style={styles.title}>{alertState.title}</Text>
-            {alertState.message ? (
-              <Text style={styles.message}>{alertState.message}</Text>
-            ) : null}
-          </View>
-          
-          <View style={styles.buttonContainer}>
-            {alertState.buttons.length === 1 ? (
-              // Single button layout
-              <TouchableOpacity 
-                style={[styles.button, styles.singleButton]}
-                onPress={() => onButtonPress(alertState.buttons[0])}
-                activeOpacity={0.8}
-              >
-                <Text style={getButtonTextStyle(alertState.buttons[0])}>
-                  {alertState.buttons[0].text}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              // Multiple button layout (horizontal)
-              <View style={styles.multiButtonContainer}>
-                {alertState.buttons.map((button, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={getButtonStyle(button, index)}
-                    onPress={() => onButtonPress(button)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={getButtonTextStyle(button)}>
-                      {button.text}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => (cancelBtn ? onButtonPress(cancelBtn) : onHide())}>
+      <View style={st.overlay}>
+        <View style={[st.card, { backgroundColor: isDark ? '#12142A' : '#FFFFFF', borderColor: c.border }]}>
+          <Text style={[st.title, { color: c.textWhite }]}>{alertState.title}</Text>
+          {alertState.message ? <Text style={[st.message, { color: c.textMuted }]}>{alertState.message}</Text> : null}
+          <View style={[st.actions, stacked && { flexDirection: 'column' }]}>
+            {alertState.buttons.map((b, i) => {
+              const destructive = b.style === 'destructive';
+              const cancel = b.style === 'cancel';
+              const primary = !cancel && !destructive;
+              return (
+                <Pressable
+                  key={i}
+                  onPress={() => onButtonPress(b)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    st.btn,
+                    !stacked && { flex: 1 },
+                    cancel && { backgroundColor: c.glassBg, borderWidth: 1, borderColor: c.border },
+                    primary && { backgroundColor: c.primary },
+                    destructive && { backgroundColor: c.error },
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Text style={[st.btnTxt, { color: cancel ? c.textWhite : '#FFFFFF' }]}>{b.text}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       </View>
@@ -194,91 +96,12 @@ function WebAlertModal({ alertState, onButtonPress, onHide }: WebAlertModalProps
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Platform.OS === 'ios' ? 14 : 12,
-    minWidth: 280,
-    maxWidth: 420,
-    // iOS style shadow
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-      },
-      android: {
-        elevation: 12,
-      },
-    }),
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 20,
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: Platform.OS === 'ios' ? '600' : '500',
-    color: '#1D1D1F',
-    marginBottom: 8,
-    textAlign: 'center',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
-  },
-  message: {
-    fontSize: 15,
-    color: '#86868B',
-    textAlign: 'center',
-    lineHeight: 20,
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
-  },
-  buttonContainer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#D1D1D6',
-  },
-  multiButtonContainer: {
-    flexDirection: 'row',
-  },
-  button: {
-    paddingVertical: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 56,
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  singleButton: {
-    flex: 0,
-    width: '100%',
-  },
-  buttonWithBorder: {
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: '#D1D1D6',
-  },
-  defaultButtonText: {
-    color: '#007AFF',
-    fontSize: 17,
-    fontWeight: Platform.OS === 'ios' ? '600' : '500',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
-  },
-  cancelButtonText: {
-    color: '#007AFF',
-    fontSize: 17,
-    fontWeight: Platform.OS === 'ios' ? '400' : '400',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
-  },
-  destructiveButtonText: {
-    color: '#FF3B30',
-    fontSize: 17,
-    fontWeight: Platform.OS === 'ios' ? '600' : '500',
-    letterSpacing: Platform.OS === 'ios' ? -0.24 : 0,
-  },
+const st = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28 },
+  card: { width: '100%', maxWidth: 380, borderRadius: 24, borderWidth: 1, padding: 24, gap: 10 },
+  title: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  message: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  btn: { minHeight: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  btnTxt: { fontSize: 15, fontWeight: '700' },
 });

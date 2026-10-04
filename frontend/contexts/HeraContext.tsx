@@ -48,6 +48,8 @@ export interface HeraUser {
   focusAreas: string[];
   onboardingComplete: boolean;
   streak: number;
+  /** Other onboarding answers (location, age, gender, …) — editable in Edit Profile */
+  profile?: Record<string, string>;
 }
 
 export interface NotifSetting {
@@ -321,8 +323,12 @@ export function HeraProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Ref guard so syncNow keeps a stable identity — depending on syncStatus made
+  // the auto-sync effect re-fire after every status change (blinking sync icon).
+  const syncingRef = useRef(false);
   const syncNow = useCallback(async () => {
-    if (syncStatus === 'syncing') return;
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     setSyncStatus('syncing');
     try {
       const result = await fullSync({
@@ -338,8 +344,10 @@ export function HeraProvider({ children }: { children: ReactNode }) {
       setSyncStatus(result.errors.length > 0 ? 'error' : 'success');
     } catch {
       setSyncStatus('error');
+    } finally {
+      syncingRef.current = false;
     }
-  }, [syncStatus, applyRemoteData]);
+  }, [applyRemoteData]);
 
   // Auto-sync when auth state changes to authenticated.
   // Blocked when syncLockRef is true — login screen calls lockSync() before OTP verify

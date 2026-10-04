@@ -107,31 +107,31 @@ const mSt = StyleSheet.create({
 });
 
 // Delete modal always dark
-const delSt = StyleSheet.create({
+const makeDelSt = (c: ThemeColors, isDark: boolean) => StyleSheet.create({
   centeredWrap:     { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xl },
   card:             { width: '100%', borderRadius: Radius.xxl, borderWidth: 1.5, borderColor: 'rgba(248,113,113,0.35)', padding: Spacing.xl, gap: Spacing.lg, alignItems: 'center' },
   iconCircle:       { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(248,113,113,0.12)', borderWidth: 2, borderColor: 'rgba(248,113,113,0.35)', alignItems: 'center', justifyContent: 'center' },
-  title:            { fontSize: FontSize.xl, color: '#FFFFFF', fontWeight: '700', textAlign: 'center' },
-  subtitle:         { fontSize: FontSize.sm, color: 'rgba(192,132,252,0.7)', textAlign: 'center', lineHeight: 20 },
+  title:            { fontSize: FontSize.xl, color: c.textWhite, fontWeight: '700', textAlign: 'center' },
+  subtitle:         { fontSize: FontSize.sm, color: c.textMuted, textAlign: 'center', lineHeight: 20 },
   warningBox:       { width: '100%', backgroundColor: 'rgba(248,113,113,0.07)', borderRadius: Radius.lg, borderWidth: 1, borderColor: 'rgba(248,113,113,0.2)', padding: Spacing.md, gap: 6 },
-  warningItem:      { fontSize: FontSize.sm, color: 'rgba(192,132,252,0.7)', lineHeight: 20 },
+  warningItem:      { fontSize: FontSize.sm, color: c.textMuted, lineHeight: 20 },
   confirmWrap:      { width: '100%', gap: Spacing.sm },
-  confirmLabel:     { fontSize: FontSize.sm, color: 'rgba(192,132,252,0.7)', textAlign: 'center', lineHeight: 20 },
-  confirmInput:     { borderWidth: 1.5, borderColor: 'rgba(168,85,247,0.3)', borderRadius: Radius.lg, padding: Spacing.md, fontSize: FontSize.base, textAlign: 'center', fontWeight: '700', letterSpacing: 3 },
-  confirmInputReady:{ borderColor: '#F87171', backgroundColor: 'rgba(248,113,113,0.08)' },
+  confirmLabel:     { fontSize: FontSize.sm, color: c.textMuted, textAlign: 'center', lineHeight: 20 },
+  confirmInput:     { borderWidth: 1.5, borderColor: c.border, borderRadius: Radius.lg, padding: Spacing.md, fontSize: FontSize.base, textAlign: 'center', fontWeight: '700', letterSpacing: 3 },
+  confirmInputReady:{ borderColor: c.error, backgroundColor: 'rgba(248,113,113,0.08)' },
   actions:          { width: '100%', gap: Spacing.sm },
-  cancelBtn:        { paddingVertical: 14, borderRadius: Radius.xl, borderWidth: 1, borderColor: 'rgba(168,85,247,0.25)', backgroundColor: 'rgba(168,85,247,0.06)', alignItems: 'center' },
-  cancelTxt:        { fontSize: FontSize.base, color: '#FFFFFF', fontWeight: '700' },
-  deleteConfirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 14, borderRadius: Radius.xl, backgroundColor: '#F87171' },
+  cancelBtn:        { paddingVertical: 14, borderRadius: Radius.xl, borderWidth: 1, borderColor: c.border, backgroundColor: c.glassPurple, alignItems: 'center' },
+  cancelTxt:        { fontSize: FontSize.base, color: c.textWhite, fontWeight: '700' },
+  deleteConfirmBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 14, borderRadius: Radius.xl, backgroundColor: c.error },
   deleteConfirmTxt: { fontSize: FontSize.base, color: 'white', fontWeight: '700' },
-  legalNote:        { fontSize: FontSize.xs, color: 'rgba(192,132,252,0.4)', textAlign: 'center', lineHeight: 17 },
+  legalNote:        { fontSize: FontSize.xs, color: c.textSubtle, textAlign: 'center', lineHeight: 17 },
   otpBoxRow:        { flexDirection: 'row', gap: Spacing.md, justifyContent: 'center' },
-  otpBox:           { width: 58, height: 68, borderRadius: Radius.xl, borderWidth: 2, borderColor: '#3A3A50', backgroundColor: '#1E1E2E', fontSize: 28, color: '#FFFFFF', textAlign: 'center', fontWeight: '800' },
-  otpBoxFilled:     { borderColor: '#A855F7', backgroundColor: '#1E1E2E' },
-  otpBoxFocused:    { borderColor: '#8B5CF6', shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.65, shadowRadius: 10, elevation: 10 },
-  otpHint:          { fontSize: FontSize.xs, color: 'rgba(192,132,252,0.5)', marginTop: 2 },
+  otpBox:           { width: 58, height: 68, borderRadius: Radius.xl, borderWidth: 2, borderColor: isDark ? '#3A3A50' : 'rgba(0,0,0,0.12)', backgroundColor: isDark ? '#1E1E2E' : '#FFFFFF', fontSize: 28, color: c.textWhite, textAlign: 'center', fontWeight: '800' },
+  otpBoxFilled:     { borderColor: c.primary, backgroundColor: isDark ? '#1E1E2E' : '#FFFFFF' },
+  otpBoxFocused:    { borderColor: c.primary, shadowColor: c.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.65, shadowRadius: 10, elevation: 10 },
+  otpHint:          { fontSize: FontSize.xs, color: c.textSubtle, marginTop: 2 },
   resendBtn:        { alignItems: 'center', paddingVertical: Spacing.sm },
-  resendTxt:        { fontSize: FontSize.sm, color: '#C084FC', fontWeight: '600' },
+  resendTxt:        { fontSize: FontSize.sm, color: c.primary, fontWeight: '600' },
 });
 
 const createStyles = (c: ThemeColors) => StyleSheet.create({
@@ -277,6 +277,7 @@ function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c, isDark, toggleTheme } = useTheme();
   const s = useMemo(() => createStyles(c), [c]);
+  const delSt = useMemo(() => makeDelSt(c, isDark), [c, isDark]);
   const { user, updateUser, journalEntries, visionItems, favoriteAffirmations, notifMorning, notifEvening, updateNotifMorning, updateNotifEvening, syncStatus, lastSyncedAt, syncNow, isAuthenticated } = useHera();
   const { user: authUser, logout } = useAuth();
   const { showAlert } = useAlert();
@@ -864,7 +865,7 @@ function ProfileScreen() {
           <View style={s.settingsCard}>
             {[
               { icon: 'diamond', iconBg: 'rgba(244,114,182,0.12)', iconColor: c.gold, label: 'Hera Premium', right: isSubscribed ? 'Active' : 'Upgrade', onPress: () => router.push('/subscription'), divider: true },
-              { icon: 'shield-checkmark', iconBg: c.glassPurple, iconColor: c.primaryLight, label: 'Privacy & Data', right: null, onPress: () => setPrivacyVisible(true), divider: true },
+              { icon: 'person-circle', iconBg: c.glassPurple, iconColor: c.primaryLight, label: 'Edit Profile', right: null, onPress: () => router.push('/edit-profile'), divider: true },
               { icon: 'help-circle', iconBg: c.glassPurple, iconColor: c.primaryLight, label: 'Help & Support', right: null, onPress: () => setHelpVisible(true), divider: true },
             ].map((item, i) => (
               <Pressable key={i} onPress={item.onPress} style={({ pressed }) => [s.settingRow, item.divider && s.settingDivider, pressed && { opacity: 0.75 }]}>
@@ -887,7 +888,7 @@ function ProfileScreen() {
           <Text style={s.sectionTitle}>Legal & Terms</Text>
           <View style={s.settingsCard}>
             <Pressable
-              onPress={() => Linking.openURL('https://app.notion.com/p/Hera-Terms-of-Use-EULA-3ccf86af27cf808eb8c3ee4bcae433d8')}
+              onPress={() => router.push('/terms')}
               style={({ pressed }) => [s.settingRow, s.settingDivider, pressed && { opacity: 0.75 }]}
             >
               <View style={s.settingLeft}>
@@ -895,14 +896,14 @@ function ProfileScreen() {
                   <Ionicons name="document-text" size={17} color={c.primaryLight} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={s.settingLabel} numberOfLines={1}>Terms of Service (EULA)</Text>
-                  <Text style={{ fontSize: FontSize.xs, color: c.textSubtle, marginTop: 1 }} numberOfLines={1}>Apple Standard License Agreement</Text>
+                  <Text style={s.settingLabel} numberOfLines={1}>Terms and Conditions</Text>
+                  <Text style={{ fontSize: FontSize.xs, color: c.textSubtle, marginTop: 1 }} numberOfLines={1}>Rules for using Hera</Text>
                 </View>
               </View>
-              <Ionicons name="open-outline" size={15} color={c.textSubtle} />
+              <Ionicons name="chevron-forward" size={15} color={c.textSubtle} />
             </Pressable>
             <Pressable
-              onPress={() => Linking.openURL('https://downloadhera.com/privacy')}
+              onPress={() => router.push('/privacy-policy')}
               style={({ pressed }) => [s.settingRow, pressed && { opacity: 0.75 }]}
             >
               <View style={s.settingLeft}>
@@ -914,7 +915,7 @@ function ProfileScreen() {
                   <Text style={{ fontSize: FontSize.xs, color: c.textSubtle, marginTop: 1 }} numberOfLines={1}>How we protect your data</Text>
                 </View>
               </View>
-              <Ionicons name="open-outline" size={15} color={c.textSubtle} />
+              <Ionicons name="chevron-forward" size={15} color={c.textSubtle} />
             </Pressable>
           </View>
         </View>
@@ -940,18 +941,18 @@ function ProfileScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-          <LinearGradient colors={['#0D0F22', '#080A18']} style={delSt.card}>
+          <LinearGradient colors={isDark ? ['#0D0F22', '#080A18'] : ['#FFFFFF', '#FEF4F6']} style={delSt.card}>
             {deleteStep === 'confirm' && (
               <>
-                <View style={delSt.iconCircle}><Ionicons name="warning" size={28} color="#F87171" /></View>
+                <View style={delSt.iconCircle}><Ionicons name="warning" size={28} color={c.error} /></View>
                 <Text style={delSt.title}>Delete Account</Text>
-                <Text style={delSt.subtitle}>This action is <Text style={{ color: '#F87171', fontWeight: '700' }}>permanent and irreversible</Text>. All your data will be erased immediately.</Text>
+                <Text style={delSt.subtitle}>This action is <Text style={{ color: c.error, fontWeight: '700' }}>permanent and irreversible</Text>. All your data will be erased immediately.</Text>
                 <View style={delSt.warningBox}>
                   {['All journal entries', 'All vision board items', 'Entire chat history', 'Cloud sync data', 'Your Hera account'].map((item, i) => <Text key={i} style={delSt.warningItem}>{item}</Text>)}
                 </View>
                 <View style={delSt.confirmWrap}>
-                  <Text style={delSt.confirmLabel}>Type <Text style={{ color: '#F87171', fontWeight: '800', fontFamily: 'monospace' }}>DELETE</Text> to confirm</Text>
-                  <TextInput value={deleteConfirmText} onChangeText={setDeleteConfirmText} placeholder="Type DELETE here" placeholderTextColor={isDark ? 'rgba(192,132,252,0.3)' : 'rgba(26,10,20,0.3)'} style={[delSt.confirmInput, { backgroundColor: isDark ? 'rgba(168,85,247,0.06)' : 'rgba(0,0,0,0.05)', color: isDark ? '#FFFFFF' : '#1A0A14' }, deleteConfirmText.trim().toUpperCase() === 'DELETE' && delSt.confirmInputReady]} autoCapitalize="characters" autoCorrect={false} editable={!deleteLoading} />
+                  <Text style={delSt.confirmLabel}>Type <Text style={{ color: c.error, fontWeight: '800', fontFamily: 'monospace' }}>DELETE</Text> to confirm</Text>
+                  <TextInput value={deleteConfirmText} onChangeText={setDeleteConfirmText} placeholder="Type DELETE here" placeholderTextColor={c.textSubtle} style={[delSt.confirmInput, { backgroundColor: isDark ? 'rgba(168,85,247,0.06)' : 'rgba(0,0,0,0.05)', color: isDark ? '#FFFFFF' : '#1A0A14' }, deleteConfirmText.trim().toUpperCase() === 'DELETE' && delSt.confirmInputReady]} autoCapitalize="characters" autoCorrect={false} editable={!deleteLoading} />
                 </View>
                 <View style={delSt.actions}>
                   <Pressable onPress={() => setDeleteVisible(false)} disabled={deleteLoading} style={({ pressed }) => [delSt.cancelBtn, pressed && { opacity: 0.75 }]}><Text style={delSt.cancelTxt}>Keep My Account</Text></Pressable>
@@ -965,9 +966,9 @@ function ProfileScreen() {
             )}
             {deleteStep === 'otp' && (
               <>
-                <View style={[delSt.iconCircle, { borderColor: 'rgba(168,85,247,0.4)', backgroundColor: 'rgba(168,85,247,0.12)' }]}><Ionicons name="mail" size={28} color="#C084FC" /></View>
+                <View style={[delSt.iconCircle, { borderColor: c.borderGold, backgroundColor: c.glassPurple }]}><Ionicons name="mail" size={28} color={c.primary} /></View>
                 <Text style={delSt.title}>Verify Your Identity</Text>
-                <Text style={[delSt.subtitle, { marginBottom: 4 }]}>{`A 4-digit code has been sent to\n`}<Text style={{ color: '#FFFFFF', fontWeight: '600' }}>{deletionEmail}</Text></Text>
+                <Text style={[delSt.subtitle, { marginBottom: 4 }]}>{`A 4-digit code has been sent to\n`}<Text style={{ color: c.textWhite, fontWeight: '600' }}>{deletionEmail}</Text></Text>
                 <View style={{ width: '100%', alignItems: 'center', gap: Spacing.sm }}>
                   <View style={delSt.otpBoxRow}>
                     {[0, 1, 2, 3].map(i => (
@@ -1008,7 +1009,7 @@ function ProfileScreen() {
                   style={[delSt.resendBtn, (resendCooldown > 0 || otpLoading) && { opacity: 0.42 }]}
                 >
                   {resendCooldown > 0 ? (
-                    <Text style={[delSt.resendTxt, { color: 'rgba(192,132,252,0.4)' }]}>Resend in {resendCooldown}s</Text>
+                    <Text style={[delSt.resendTxt, { color: c.textSubtle }]}>Resend in {resendCooldown}s</Text>
                   ) : (
                     <Text style={delSt.resendTxt}>Resend code</Text>
                   )}
@@ -1023,7 +1024,7 @@ function ProfileScreen() {
                 <Text style={[delSt.title, { color: '#34D399', fontSize: FontSize.xl }]}>Account Deleted</Text>
                 <Text style={[delSt.subtitle, { lineHeight: 22 }]}>
                   Your account and data have been{' '}
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>permanently deleted.</Text>
+                  <Text style={{ color: c.textWhite, fontWeight: '700' }}>permanently deleted.</Text>
                 </Text>
                 <View style={[delSt.warningBox, { borderColor: 'rgba(52,211,153,0.2)', backgroundColor: 'rgba(52,211,153,0.06)', gap: 8 }]}>
                   {['Journal entries cleared', 'Vision board cleared', 'Chat history cleared', 'Cloud data removed', 'Account permanently removed'].map((item, i) => (
@@ -1033,7 +1034,7 @@ function ProfileScreen() {
                     </View>
                   ))}
                 </View>
-                <Text style={{ fontSize: FontSize.sm, color: 'rgba(192,132,252,0.5)', textAlign: 'center', fontStyle: 'italic' }}>
+                <Text style={{ fontSize: FontSize.sm, color: c.textSubtle, textAlign: 'center', fontStyle: 'italic' }}>
                   Returning to welcome screen...
                 </Text>
               </>

@@ -157,7 +157,7 @@ const createStyles = (c: ThemeColors) => StyleSheet.create({
   modalActions:  { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
   // Detail modal
   detailOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
-  detailSheet:   { maxHeight: '92%', borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, overflow: 'hidden' },
+  detailSheet:   { height: '88%', borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, overflow: 'hidden' },
 });
 
 export default function JournalScreen() {

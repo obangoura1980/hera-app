@@ -7,6 +7,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { Audio } from '@/src/utils/av-shim';
+import { useFocusEffect } from 'expo-router';
 import { Colors, FontSize, Spacing, Radius } from '@/constants/theme';
 
 // Royalty-free ambient track — replace with a licensed meditation audio URL for production
@@ -161,19 +162,8 @@ export function AudioAffirmationPlayer({
           { uri: AMBIENT_MUSIC_URL },
           { isLooping: true, volume: 0.28, shouldPlay: false },
         );
-        if (mounted) {
-          bgSoundR.current = sound;
-          // Prime the buffer (silent play → stop) so the first real Play starts instantly.
-          // On web, autoplay policy may block this — the catch/finally keeps volume correct.
-          try {
-            await sound.setVolumeAsync(0);
-            await sound.playAsync();
-            await sound.stopAsync(); // pause + rewind to 0, buffer stays warm
-          } catch {
-          } finally {
-            await sound.setVolumeAsync(0.28).catch(() => {});
-          }
-        }
+        // Loaded but never auto-played — music only starts when the user taps Play
+        if (mounted) bgSoundR.current = sound;
       } catch {
         // No background music — visuals-only graceful degradation
       }
@@ -244,6 +234,10 @@ export function AudioAffirmationPlayer({
     if (playR.current) await handlePause();
     else await handlePlay();
   }, [handlePlay, handlePause]);
+
+  // Pause whenever the user leaves this screen (tabs stay mounted) so music
+  // never keeps playing in the background on other screens.
+  useFocusEffect(useCallback(() => () => { if (playR.current) handlePause(); }, [handlePause]));
 
   const handleSkip = useCallback((dir: 1 | -1) => {
     const wasPlaying = playR.current;

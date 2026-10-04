@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, TextInput, Modal,
-  KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions,
+  KeyboardAvoidingView, Platform, Animated, PanResponder, Dimensions, BackHandler,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@react-native-vector-icons/ionicons';
@@ -10,9 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Spacing, Radius, FontSize } from '@/constants/theme';
 import type { VisionItem } from '@/contexts/HeraContext';
 
@@ -97,6 +97,7 @@ function ProgressSlider({
     setShown(value);
   }, [value, trackW]);
 
+  const lastPct = useSharedValue(-1);
   const pan = useMemo(() => Gesture.Pan()
     .activeOffsetX([-4, 4])   // claim horizontal drags…
     .failOffsetY([-14, 14])   // …but let vertical scrolling win
@@ -104,10 +105,12 @@ function ProgressSlider({
     .onUpdate(e => {
       const next = Math.max(0, Math.min(trackW, startPos.value + e.translationX));
       pos.value = next;
-      runOnJS(liveUpdate)(next);
+      // Only cross to JS when the visible integer % changes (no per-frame re-renders)
+      const pct = Math.round((next / Math.max(1, trackW)) * 100);
+      if (pct !== lastPct.value) { lastPct.value = pct; runOnJS(setShown)(pct); }
     })
     .onEnd(() => { runOnJS(commit)(pos.value); }),
-  [trackW, liveUpdate, commit]);
+  [trackW, commit]);
 
   const tap = useMemo(() => Gesture.Tap()
     .onEnd(e => {
@@ -193,19 +196,25 @@ function VisionImage({
   // Normalise the URI — strip leading/trailing whitespace
   const cleanUri = uri?.trim() ?? '';
   const isValid = cleanUri.startsWith('http://') || cleanUri.startsWith('https://');
+  useEffect(() => { setErrored(false); }, [cleanUri]);
 
-  // Pick a stable fallback based on URI hash
-  const fallbackUri = useMemo(() => {
-    let h = 0;
-    for (const ch of cleanUri) h = (h * 31 + ch.charCodeAt(0)) & 0xffff;
-    return PLACEHOLDER_IMGS[h % PLACEHOLDER_IMGS.length];
-  }, [cleanUri]);
-
-  const resolvedUri = (!isValid || errored) ? fallbackUri : cleanUri;
+  // Never swap in a random image — show an honest "unavailable" state instead
+  if (!isValid || errored) {
+    const accent = fallbackAccent ?? c.primary;
+    return (
+      <View style={[style, { alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: c.glassPurple }]}>
+        <Ionicons name="image-outline" size={34} color={accent} />
+        <Text style={{ fontSize: FontSize.xs, color: c.textSubtle, textAlign: 'center', paddingHorizontal: 8 }}>
+          {isValid ? "Couldn't load image — use a direct image link" : 'No image'}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <Image
-      source={{ uri: resolvedUri }}
+      // Browser-like UA: some CDNs (e.g. Pixabay) reject default native agents
+      source={{ uri: cleanUri, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36', Accept: 'image/*' } }}
       style={style}
       contentFit="cover"
       transition={300}
@@ -385,7 +394,8 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
 
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent>
-      <View style={{ flex: 1 }}>
+      {/* Android modals render outside the root gesture view — RNGH needs its own root here */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <LinearGradient colors={bgColors} style={StyleSheet.absoluteFill} />
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <ScrollView
@@ -546,7 +556,7 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -592,7 +602,8 @@ function VisionDetailModal({
 
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent>
-      <View style={{ flex: 1 }}>
+      {/* Android modals render outside the root gesture view — RNGH needs its own root here */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <LinearGradient colors={bgColors} style={StyleSheet.absoluteFill} />
         <ScrollView
           contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.xl }}
@@ -701,7 +712,7 @@ function VisionDetailModal({
             </Pressable>
           </View>
         </ScrollView>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -747,6 +758,16 @@ export default function VisionScreen() {
     setDetailItem(item);
     setShowDetailModal(true);
   }, []);
+
+  // Android hardware/gesture back: return to Home instead of exiting the app
+  // (open modals handle back themselves via onRequestClose)
+  useFocusEffect(useCallback(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.navigate('/(tabs)');
+      return true;
+    });
+    return () => sub.remove();
+  }, []));
 
   const handleEditFromDetail = useCallback((item: VisionItem) => {
     setShowDetailModal(false);

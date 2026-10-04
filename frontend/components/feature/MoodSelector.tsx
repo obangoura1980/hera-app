@@ -18,7 +18,7 @@ interface MoodSelectorProps {
 
 const createStyles = (c: ThemeColors) => StyleSheet.create({
   row:           { flexDirection: 'row', gap: Spacing.xs },
-  btn:           { flex: 1, alignItems: 'center', padding: Spacing.sm, borderRadius: Radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.glassBg, gap: 4 },
+  btn:           { flex: 1, alignItems: 'center', paddingVertical: Spacing.sm, paddingHorizontal: 2, borderRadius: Radius.md, borderWidth: 1, borderColor: c.border, backgroundColor: c.glassBg, gap: 4 },
   selected:      { borderColor: c.gold, backgroundColor: c.glassGold },
   emoji:         { fontSize: 22 },
   label:         { fontSize: FontSize.xs, color: c.textMuted, fontWeight: '500' },
@@ -38,7 +38,7 @@ export function MoodSelector({ selected, onSelect }: MoodSelectorProps) {
           style={[styles.btn, selected === m.value && styles.selected]}
         >
           <Text style={styles.emoji}>{m.emoji}</Text>
-          <Text style={[styles.label, selected === m.value && styles.labelSelected]}>{m.label}</Text>
+          <Text style={[styles.label, selected === m.value && styles.labelSelected]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{m.label}</Text>
         </Pressable>
       ))}
     </View>

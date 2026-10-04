@@ -65,3 +65,13 @@
 - Daily reminders: expo-notifications (morning/evening), permission check -> request -> Open Settings when blocked; web shows "Mobile Only"; plugin added to app.json
 - Reset Journey fixed (updateUser) and now calls POST /api/account/reset; Privacy Policy link wired
 - Tested: iteration_5 backend 8/8, frontend pass
+
+## Update (2026-06) — UI polish batch (iterations 15-24)
+- Onboarding: follows app light/dark theme (style factories + T() palette mapper), theme toggle next to mute on splash/welcome/questions; answers cached in src/onboarding-progress.ts; email gate back = real pop to Q20
+- Edit Profile screen (/edit-profile) edits name, goals + all onboarding answers (user.profile)
+- In-app Privacy Policy (/privacy-policy) & Terms (/terms) placeholder screens
+- Themed custom alert modal for all showAlert calls (template/ui/context.tsx), Delete Account popup theme-aware
+- Vision: gesture-handler/reanimated slider, honest image-error state (no random fallback), Pixabay UA header, Android back → Home
+- Journal: detail sheet height fix, mood label one line; ambient music never auto-plays, pauses on leaving Discover
+- Chat: reset (refresh) icon; offline top toast; sync icon blink fixed
+- RevenueCat deferred by user (demo trial still mocked)

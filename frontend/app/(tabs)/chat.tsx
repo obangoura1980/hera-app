@@ -223,7 +223,7 @@ export default function ChatScreen() {
             </View>
           )}
           <Pressable onPress={handleClearChat} hitSlop={12}>
-            <Ionicons name="ellipsis-horizontal" size={22} color={c.textMuted} />
+            <Ionicons name="refresh" size={22} color={c.textMuted} />
           </Pressable>
         </View>
       </View>

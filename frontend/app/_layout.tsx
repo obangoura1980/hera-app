@@ -33,7 +33,7 @@ function AppContent() {
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="login" options={{ animation: 'slide_from_bottom', headerShown: false, gestureEnabled: false, headerBackVisible: false }} />
@@ -41,6 +41,9 @@ function AppContent() {
         <Stack.Screen name="subscription" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="visualization" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="discover-detail" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="privacy-policy" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="terms" options={{ animation: 'slide_from_right' }} />
       </Stack>
       <OfflineNotice />
     </>
@@ -57,8 +60,8 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <KeyboardProvider>
+    <ThemeProvider>
     <AlertProvider>
-      <ThemeProvider>
         <SafeAreaProvider>
           <AuthProvider>
             <SubscriptionProvider>
@@ -68,8 +71,8 @@ export default function RootLayout() {
             </SubscriptionProvider>
           </AuthProvider>
         </SafeAreaProvider>
-      </ThemeProvider>
     </AlertProvider>
+    </ThemeProvider>
     </KeyboardProvider>
     </GestureHandlerRootView>
   );

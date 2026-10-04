@@ -21,7 +21,9 @@ import Ionicons from '@react-native-vector-icons/ionicons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@/src/utils/async-storage';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '@/constants/theme';
+import { DarkColors, LightColors, Spacing, Radius, FontSize, Shadow } from '@/constants/theme';
+import type { ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/hooks/useTheme';
 import { useHera } from '@/hooks/useHera';
 import { KeyboardAwareScrollView, KeyboardStickyView, KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -42,6 +44,31 @@ function useAnswerState<T>(key: string, initial: T) {
     });
   }, [key]);
   return [v, set] as const;
+}
+
+
+// ── Onboarding theme (follows the app light/dark theme) ─────────────────────
+// Styles are rebuilt when the theme flips; T() maps the original dark-palette
+// literals to their light-theme equivalents.
+let IS_DARK = true;
+let Colors: ThemeColors = DarkColors;
+const LIGHT_HEX: Record<string, string> = {
+  '#A855F7': '#C4707A', '#EC4899': '#A85560', '#7C3AED': '#A85560',
+  '#080A18': '#FDE8EA', '#020408': '#FDE8EA', '#060B1E': '#FEF0F2',
+  '#0F1028': '#FEF0F2', '#0D1035': '#FEF0F2', '#0F0720': '#FEF0F2', '#1A0D2E': '#FEF0F2',
+  '#131838': '#FFFFFF', '#0F172A': '#FFFFFF', '#0D0F22': '#FFFFFF',
+};
+function T(c: string): string {
+  if (IS_DARK) return c;
+  if (LIGHT_HEX[c]) return LIGHT_HEX[c];
+  const m = c.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\)$/);
+  if (!m) return c;
+  const rgb = `${m[1]},${m[2]},${m[3]}`;
+  const a = m[4];
+  if (rgb === '255,255,255') return `rgba(26,10,20,${a})`;
+  if (rgb === '8,10,24') return `rgba(253,232,234,${a})`;
+  if (['168,85,247', '124,58,237', '109,40,217', '192,132,252', '236,72,153'].includes(rgb)) return `rgba(196,112,122,${a})`;
+  return c;
 }
 
 const { width } = Dimensions.get('window');
@@ -76,7 +103,7 @@ function useTypewriter(text: string, speed = 20, delay = 320): string {
 function OptionCard({ label, selected, onSelect }: { label: string; selected: boolean; onSelect: () => void }) {
   return (
     <Pressable onPress={onSelect} style={({ pressed }) => [oc.card, selected && oc.sel, pressed && { opacity: 0.8 }]}>
-      {selected && <LinearGradient colors={['rgba(168,85,247,0.22)', 'rgba(236,72,153,0.12)']} style={StyleSheet.absoluteFill} />}
+      {selected && <LinearGradient colors={[T('rgba(168,85,247,0.22)'), T('rgba(236,72,153,0.12)')]} style={StyleSheet.absoluteFill} />}
       <View style={[oc.radio, selected && oc.radioSel]}>
         {selected ? <View style={oc.dot} /> : null}
       </View>
@@ -84,7 +111,7 @@ function OptionCard({ label, selected, onSelect }: { label: string; selected: bo
     </Pressable>
   );
 }
-const oc = StyleSheet.create({
+const make_oc = () => StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.glassBorder, backgroundColor: Colors.glassBg, paddingVertical: 15, paddingHorizontal: Spacing.md, overflow: 'hidden' },
   sel: { borderColor: Colors.primaryLight },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.glassBorder, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -93,6 +120,7 @@ const oc = StyleSheet.create({
   label: { fontSize: FontSize.base, color: Colors.textMuted, fontWeight: '600' },
   labelSel: { color: Colors.textWhite },
 });
+let oc = make_oc();
 
 // ── Yes / No ───────────────────────────────────────────────────────────────────
 function YesNo({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -102,7 +130,7 @@ function YesNo({ value, onChange }: { value: string; onChange: (v: string) => vo
         const sel = value === opt;
         return (
           <Pressable key={opt} onPress={() => onChange(opt)} style={({ pressed }) => [yn.btn, sel && yn.sel, pressed && { opacity: 0.8 }]}>
-            {sel ? <LinearGradient colors={['#A855F7', '#EC4899']} style={StyleSheet.absoluteFill} /> : null}
+            {sel ? <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={StyleSheet.absoluteFill} /> : null}
             <Text style={[yn.label, sel && { color: Colors.textWhite }]}>{opt}</Text>
           </Pressable>
         );
@@ -110,11 +138,12 @@ function YesNo({ value, onChange }: { value: string; onChange: (v: string) => vo
     </View>
   );
 }
-const yn = StyleSheet.create({
+const make_yn = () => StyleSheet.create({
   btn: { flex: 1, height: 56, borderRadius: Radius.xxl, borderWidth: 1.5, borderColor: Colors.glassBorder, backgroundColor: Colors.glassBg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   sel: { borderColor: Colors.primaryLight },
   label: { fontSize: FontSize.md, color: Colors.textMuted, fontWeight: '700' },
 });
+let yn = make_yn();
 
 // ── Home Grid ──────────────────────────────────────────────────────────────────
 const HOME_TYPES = [
@@ -135,7 +164,7 @@ function HomeGrid({ value, onChange }: { value: string; onChange: (v: string) =>
         const sel = value === item.id;
         return (
           <Pressable key={item.id} onPress={() => onChange(item.id)} style={({ pressed }) => [hg.card, { width: cardW }, sel && hg.sel, pressed && { opacity: 0.8 }]}>
-            {sel ? <LinearGradient colors={['rgba(168,85,247,0.22)', 'rgba(236,72,153,0.08)']} style={StyleSheet.absoluteFill} /> : null}
+            {sel ? <LinearGradient colors={[T('rgba(168,85,247,0.22)'), T('rgba(236,72,153,0.08)')]} style={StyleSheet.absoluteFill} /> : null}
             <Text style={{ fontSize: 22 }}>{item.e}</Text>
             <Text style={[hg.label, sel && { color: Colors.gold }]}>{item.l}</Text>
           </Pressable>
@@ -144,11 +173,12 @@ function HomeGrid({ value, onChange }: { value: string; onChange: (v: string) =>
     </View>
   );
 }
-const hg = StyleSheet.create({
+const make_hg = () => StyleSheet.create({
   card: { alignItems: 'center', gap: 5, paddingVertical: 12, borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.glassBorder, backgroundColor: Colors.glassBg, overflow: 'hidden' },
   sel: { borderColor: Colors.gold },
   label: { fontSize: 10, color: Colors.textSubtle, textAlign: 'center', fontWeight: '500', lineHeight: 14, paddingHorizontal: 3 },
 });
+let hg = make_hg();
 
 // ── Add Contact Modal ──────────────────────────────────────────────────────────
 const REL_TAGS = ['Partner', 'Mom', 'Dad', 'Sister', 'Brother', 'Friend', 'Mentor', 'Child', 'Colleague'];
@@ -166,11 +196,11 @@ function AddContactModal({ visible, onAdd, onClose }: { visible: boolean; onAdd:
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={onClose} />
-        <LinearGradient colors={['#0D0F22', '#080A18']} style={acm.sheet}>
+        <Pressable style={{ flex: 1, backgroundColor: T('rgba(0,0,0,0.5)') }} onPress={onClose} />
+        <LinearGradient colors={[T('#0D0F22'), T('#080A18')]} style={acm.sheet}>
           <View style={acm.handle} />
           <Text style={acm.title}>Add a Person</Text>
-          <TextInput value={cname} onChangeText={setCname} placeholder="Their name..." placeholderTextColor="rgba(255,255,255,0.22)" style={acm.input} autoFocus autoCapitalize="words" />
+          <TextInput value={cname} onChangeText={setCname} placeholder="Their name..." placeholderTextColor={T('rgba(255,255,255,0.22)')} style={acm.input} autoFocus autoCapitalize="words" />
           <Text style={acm.relLabel}>Relationship</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: Spacing.sm, paddingVertical: 2 }}>
             {REL_TAGS.map(t => (
@@ -184,7 +214,7 @@ function AddContactModal({ visible, onAdd, onClose }: { visible: boolean; onAdd:
               <Text style={{ fontSize: FontSize.base, color: Colors.textMuted, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
             <Pressable onPress={submit} disabled={!cname.trim() || !rel} style={({ pressed }) => [acm.addWrap, (!cname.trim() || !rel) && { opacity: 0.4 }, pressed && { opacity: 0.8 }]}>
-              <LinearGradient colors={['#A855F7', '#EC4899']} style={acm.add}>
+              <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={acm.add}>
                 <Text style={{ fontSize: FontSize.base, color: 'white', fontWeight: '700' }}>Add Person</Text>
               </LinearGradient>
             </Pressable>
@@ -194,19 +224,20 @@ function AddContactModal({ visible, onAdd, onClose }: { visible: boolean; onAdd:
     </Modal>
   );
 }
-const acm = StyleSheet.create({
+const make_acm = () => StyleSheet.create({
   sheet: { borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, padding: Spacing.lg, gap: Spacing.md, paddingBottom: 36 },
   handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.glassBorder, alignSelf: 'center', marginBottom: 4 },
   title: { fontSize: FontSize.lg, color: Colors.textWhite, fontWeight: '700', textAlign: 'center' },
   input: { backgroundColor: Colors.glassBg, borderWidth: 1.5, borderColor: Colors.glassBorder, borderRadius: Radius.lg, padding: Spacing.md, fontSize: FontSize.base, color: Colors.textWhite },
   relLabel: { fontSize: FontSize.sm, color: Colors.textSubtle, fontWeight: '600' },
   tag: { paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.glassBorder, backgroundColor: Colors.glassBg },
-  tagSel: { borderColor: Colors.primary, backgroundColor: 'rgba(168,85,247,0.2)' },
+  tagSel: { borderColor: Colors.primary, backgroundColor: T('rgba(168,85,247,0.2)') },
   tagTxt: { fontSize: FontSize.sm, color: Colors.textMuted, fontWeight: '500' },
   cancel: { flex: 1, paddingVertical: 14, alignItems: 'center', backgroundColor: Colors.glassBg, borderRadius: Radius.xxl, borderWidth: 1, borderColor: Colors.glassBorder },
   addWrap: { flex: 2, borderRadius: Radius.xxl, overflow: 'hidden' },
   add: { paddingVertical: 14, alignItems: 'center' },
 });
+let acm = make_acm();
 
 // ── Countdown Timer ────────────────────────────────────────────────────────────
 function Countdown() {
@@ -231,9 +262,9 @@ function GenBar({ onDone }: { onDone: () => void }) {
   }, []);
   const w = anim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   return (
-    <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+    <View style={{ height: 6, borderRadius: 3, backgroundColor: T('rgba(255,255,255,0.1)'), overflow: 'hidden' }}>
       <Animated.View style={{ height: '100%', width: w, borderRadius: 3 }}>
-        <LinearGradient colors={['#A855F7', '#EC4899']} style={{ flex: 1 }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+        <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={{ flex: 1 }} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
       </Animated.View>
     </View>
   );
@@ -247,7 +278,7 @@ function SInput({ value, onChange, placeholder, multiline, keyboardType, autoFoc
   return (
     <TextInput
       value={value} onChangeText={onChange} placeholder={placeholder}
-      placeholderTextColor="rgba(255,255,255,0.2)"
+      placeholderTextColor={T('rgba(255,255,255,0.2)')}
       style={[si.input, multiline && si.multi]}
       multiline={multiline} keyboardType={keyboardType ?? 'default'}
       autoCapitalize={keyboardType === 'number-pad' ? 'none' : 'sentences'}
@@ -255,10 +286,11 @@ function SInput({ value, onChange, placeholder, multiline, keyboardType, autoFoc
     />
   );
 }
-const si = StyleSheet.create({
-  input: { backgroundColor: Colors.glassBg, borderWidth: 1.5, borderColor: 'rgba(124,58,237,0.45)', borderRadius: Radius.xl, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md + 2, fontSize: FontSize.base, color: Colors.textWhite },
+const make_si = () => StyleSheet.create({
+  input: { backgroundColor: Colors.glassBg, borderWidth: 1.5, borderColor: T('rgba(124,58,237,0.45)'), borderRadius: Radius.xl, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md + 2, fontSize: FontSize.base, color: Colors.textWhite },
   multi: { minHeight: 130, paddingTop: Spacing.md, textAlignVertical: 'top' },
 });
+let si = make_si();
 
 // ── Question Layout (Screens 4-23 wrapper) ────────────────────────────────────
 // Wrapped in React.memo so typing in an answer TextInput (which re-renders the parent)
@@ -268,21 +300,23 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
   onBack: () => void; onNext: () => void; canNext: boolean; nextLabel?: string; onSkip?: () => void;
   isMuted?: boolean; onToggleMute?: () => void;
 }) {
+  useTheme(); // re-render this memoized layout when the theme flips
   const insets = useSafeAreaInsets();
   const displayed = useTypewriter(title, 20, 380);
   // Measured so KeyboardAwareScrollView can keep focused inputs clear of the sticky footer
   const [footerH, setFooterH] = useState(0);
   const pct = `${Math.min(100, Math.round((qNum / TOTAL_Q) * 100))}%`;
   return (
-    <LinearGradient colors={['#080A18', '#0F1028', '#131838']} style={{ flex: 1, paddingTop: insets.top }}>
+    <LinearGradient colors={[T('#080A18'), T('#0F1028'), T('#131838')]} style={{ flex: 1, paddingTop: insets.top }}>
       <View style={ql.header}>
         <Pressable onPress={onBack} style={ql.backBtn} hitSlop={12}>
-          <Ionicons name="arrow-back" size={18} color="rgba(255,255,255,0.5)" />
+          <Ionicons name="arrow-back" size={18} color={T('rgba(255,255,255,0.5)')} />
         </Pressable>
         <View style={ql.track}>
           <View style={[ql.fill, { width: pct }]} />
         </View>
         <Text style={ql.step}>{qNum}/{TOTAL_Q}</Text>
+        <ThemeBtn />
         {onToggleMute ? <MuteBtn isMuted={!!isMuted} onToggle={onToggleMute} /> : null}
       </View>
       <KeyboardAwareScrollView
@@ -302,7 +336,7 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
           style={[ql.footer, { paddingBottom: insets.bottom + 12 }]}
         >
           <Pressable onPress={onNext} disabled={!canNext} style={({ pressed }) => [ql.btnWrap, !canNext && { opacity: 0.32 }, pressed && { opacity: 0.8 }]}>
-            <LinearGradient colors={['#A855F7', '#EC4899']} style={ql.btn}>
+            <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={ql.btn}>
               <Text style={ql.btnTxt}>{nextLabel}</Text>
               <Ionicons name="arrow-forward" size={17} color="white" />
             </LinearGradient>
@@ -319,10 +353,10 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
   );
 });
 
-const ql = StyleSheet.create({
+const make_ql = () => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: 12 },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.glassBg, borderWidth: 1, borderColor: Colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
-  track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  track: { flex: 1, height: 4, borderRadius: 2, backgroundColor: T('rgba(255,255,255,0.08)'), overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 2, backgroundColor: Colors.primaryLight },
   step: { fontSize: FontSize.xs, color: Colors.textSubtle, fontWeight: '600', minWidth: 30, textAlign: 'right' },
   scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, gap: Spacing.lg, paddingBottom: 20 },
@@ -335,6 +369,7 @@ const ql = StyleSheet.create({
   skipHint: { fontSize: FontSize.xs, color: Colors.textSubtle },
   skipTxt:  { fontSize: FontSize.sm, color: Colors.textMuted, fontWeight: '500' },
 });
+let ql = make_ql();
 
 // ── Mute Button ──────────────────────────────────────────────────────────────
 function MuteBtn({ isMuted, onToggle, style }: { isMuted: boolean; onToggle: () => void; style?: any }) {
@@ -352,23 +387,39 @@ function MuteBtn({ isMuted, onToggle, style }: { isMuted: boolean; onToggle: () 
       <Ionicons
         name={isMuted ? 'volume-mute' : 'volume-medium'}
         size={16}
-        color={isMuted ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.65)'}
+        color={isMuted ? T('rgba(255,255,255,0.35)') : T('rgba(255,255,255,0.65)')}
       />
     </Pressable>
   );
 }
-const mb = StyleSheet.create({
+// ── Theme Toggle Button (sits next to the mute button) ──────────────────────
+function ThemeBtn() {
+  const { isDark, toggleTheme } = useTheme();
+  return (
+    <Pressable
+      onPress={(e) => { (e as any)?.stopPropagation?.(); toggleTheme(); }}
+      hitSlop={12}
+      style={({ pressed }) => [mb.btn, pressed && { opacity: 0.65 }]}
+      accessibilityLabel={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+    >
+      <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={16} color={T('rgba(255,255,255,0.65)')} />
+    </Pressable>
+  );
+}
+
+const make_mb = () => StyleSheet.create({
   btn: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: T('rgba(255,255,255,0.07)'),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: T('rgba(255,255,255,0.12)'),
     alignItems: 'center',
     justifyContent: 'center',
   },
 });
+let mb = make_mb();
 
 // ── Splash Screen (Screen 1) ───────────────────────────────────────────────────
 function SplashScreen({ onContinue, onAudioStart, isMuted, onToggleMute }: { onContinue: () => void; onAudioStart?: () => void; isMuted?: boolean; onToggleMute?: () => void }) {
@@ -389,9 +440,9 @@ function SplashScreen({ onContinue, onAudioStart, isMuted, onToggleMute }: { onC
 
   return (
     <Pressable style={{ flex: 1 }} onPress={() => { onAudioStart?.(); onContinue(); }}>
-      <LinearGradient colors={['#020408', '#060B1E', '#080A18']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        <Animated.View style={{ position: 'absolute', width: 330, height: 330, borderRadius: 165, backgroundColor: 'rgba(168,85,247,0.12)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)', transform: [{ scale: pulse }] }} />
-        <Animated.View style={{ position: 'absolute', width: 480, height: 480, borderRadius: 240, backgroundColor: 'rgba(236,72,153,0.06)', borderWidth: 1, borderColor: 'rgba(236,72,153,0.1)', transform: [{ scale: pulse }], opacity: 0.55 }} />
+      <LinearGradient colors={[T('#020408'), T('#060B1E'), T('#080A18')]} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top, paddingBottom: insets.bottom }}>
+        <Animated.View style={{ position: 'absolute', width: 330, height: 330, borderRadius: 165, backgroundColor: T('rgba(168,85,247,0.12)'), borderWidth: 1, borderColor: T('rgba(168,85,247,0.3)'), transform: [{ scale: pulse }] }} />
+        <Animated.View style={{ position: 'absolute', width: 480, height: 480, borderRadius: 240, backgroundColor: T('rgba(236,72,153,0.06)'), borderWidth: 1, borderColor: T('rgba(236,72,153,0.1)'), transform: [{ scale: pulse }], opacity: 0.55 }} />
         <Animated.View style={{ alignItems: 'center', gap: Spacing.xl, opacity: fade }}>
           <Image source={require('@/assets/images/logo.png')} style={{ width: 110, height: 110 }} contentFit="contain" transition={400} />
           <Text style={spl.heraTitle}>{twText}</Text>
@@ -403,7 +454,8 @@ function SplashScreen({ onContinue, onAudioStart, isMuted, onToggleMute }: { onC
         </Animated.View>
         <Animated.Text style={[spl.tap, { opacity: fade }]}>tap anywhere to begin</Animated.Text>
         {onToggleMute ? (
-          <View style={{ position: 'absolute', top: insets.top + 12, right: Spacing.lg }} pointerEvents="box-none">
+          <View style={{ position: 'absolute', top: insets.top + 12, right: Spacing.lg, flexDirection: 'row', gap: Spacing.sm }} pointerEvents="box-none">
+            <ThemeBtn />
             <MuteBtn isMuted={!!isMuted} onToggle={(e) => { (e as any)?.stopPropagation?.(); onToggleMute(); }} />
           </View>
         ) : null}
@@ -411,12 +463,13 @@ function SplashScreen({ onContinue, onAudioStart, isMuted, onToggleMute }: { onC
     </Pressable>
   );
 }
-const spl = StyleSheet.create({
-  heraTitle: { fontSize: 52, color: Colors.textWhite, fontWeight: '900', letterSpacing: 16, textShadowColor: 'rgba(124,58,237,0.95)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 28 },
+const make_spl = () => StyleSheet.create({
+  heraTitle: { fontSize: 52, color: Colors.textWhite, fontWeight: '900', letterSpacing: 16, textShadowColor: T('rgba(124,58,237,0.95)'), textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 28 },
   tagline: { fontSize: FontSize.sm, color: Colors.gold, fontWeight: '600', letterSpacing: 0.8 },
-  tap: { position: 'absolute', bottom: 72, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.26)', fontStyle: 'italic' },
+  tap: { position: 'absolute', bottom: 72, fontSize: FontSize.sm, color: T('rgba(255,255,255,0.26)'), fontStyle: 'italic' },
 
 });
+let spl = make_spl();
 
 // ── Generating Screen (Screen 24) ──────────────────────────────────────────────
 function GeneratingScreen({ displayName, onDone }: { displayName: string; onDone: () => void }) {
@@ -433,14 +486,14 @@ function GeneratingScreen({ displayName, onDone }: { displayName: string; onDone
   }, []);
 
   return (
-    <LinearGradient colors={['#0F0720', '#1A0D2E', '#0F172A']} style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
+    <LinearGradient colors={[T('#0F0720'), T('#1A0D2E'), T('#0F172A')]} style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: Spacing.lg, gap: Spacing.xl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
           <View style={{ position: 'relative' }}>
-            <LinearGradient colors={['#A855F7', '#7C3AED']} style={gs.avatar}>
+            <LinearGradient colors={[T('#A855F7'), T('#7C3AED')]} style={gs.avatar}>
               <Text style={{ fontSize: FontSize.xl, color: Colors.gold, fontWeight: '800' }}>H</Text>
             </LinearGradient>
-            <View style={{ position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.success, borderWidth: 2, borderColor: '#0F0720' }} />
+            <View style={{ position: 'absolute', bottom: 1, right: 1, width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.success, borderWidth: 2, borderColor: T('#0F0720') }} />
           </View>
           <View>
             <Text style={{ fontSize: FontSize.base, color: Colors.textWhite, fontWeight: '700' }}>Hera</Text>
@@ -451,8 +504,8 @@ function GeneratingScreen({ displayName, onDone }: { displayName: string; onDone
           </View>
         </View>
         <View style={{ borderRadius: 20, borderBottomLeftRadius: 4, overflow: 'hidden' }}>
-          <LinearGradient colors={['rgba(168,85,247,0.35)', 'rgba(109,40,217,0.2)']} style={{ padding: Spacing.lg }}>
-            <Text style={{ fontSize: FontSize.base, color: 'rgba(255,255,255,0.92)', lineHeight: 24 }}>{genText}</Text>
+          <LinearGradient colors={[T('rgba(168,85,247,0.35)'), T('rgba(109,40,217,0.2)')]} style={{ padding: Spacing.lg }}>
+            <Text style={{ fontSize: FontSize.base, color: T('rgba(255,255,255,0.92)'), lineHeight: 24 }}>{genText}</Text>
           </LinearGradient>
         </View>
         {showBar ? (
@@ -467,9 +520,10 @@ function GeneratingScreen({ displayName, onDone }: { displayName: string; onDone
     </LinearGradient>
   );
 }
-const gs = StyleSheet.create({
+const make_gs = () => StyleSheet.create({
   avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Colors.gold },
 });
+let gs = make_gs();
 
 // ── Referral Screen (Screen 3) ────────────────────────────────────────────────
 // Valid codes — extend this list as needed
@@ -501,10 +555,10 @@ function ReferralScreen({
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={['#080A18', '#0D1035', '#131838']} style={{ flex: 1, paddingTop: insets.top }}>
+      <LinearGradient colors={[T('#080A18'), T('#0D1035'), T('#131838')]} style={{ flex: 1, paddingTop: insets.top }}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, paddingHorizontal: Spacing.lg }}>
           <Pressable onPress={onBack} style={[ws.backBtn, { marginTop: 12, marginBottom: Spacing.xl }]} hitSlop={12}>
-            <Ionicons name="arrow-back" size={18} color="rgba(255,255,255,0.45)" />
+            <Ionicons name="arrow-back" size={18} color={T('rgba(255,255,255,0.45)')} />
           </Pressable>
           <View style={{ flex: 1, justifyContent: 'center', gap: Spacing.lg }}>
             <Text style={ws.title}>Do you have a{'\n'}referral code?</Text>
@@ -514,7 +568,7 @@ function ReferralScreen({
                 value={referralCode}
                 onChangeText={t => { setReferralCode(t.toUpperCase()); setError(''); setApplied(false); }}
                 placeholder="FRIEND-CODE"
-                placeholderTextColor="rgba(255,255,255,0.18)"
+                placeholderTextColor={T('rgba(255,255,255,0.18)')}
                 style={[
                   rf.input,
                   error ? { borderColor: Colors.error } : null,
@@ -542,7 +596,7 @@ function ReferralScreen({
               onPress={handleContinue}
               style={({ pressed }) => [ws.btnWrap, pressed && { opacity: 0.8 }]}
             >
-              <LinearGradient colors={['#A855F7', '#EC4899']} style={ws.btn}>
+              <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={ws.btn}>
                 <Text style={ws.btnTxt}>{referralCode.trim() ? 'Apply & Continue' : 'Continue'}</Text>
                 <Ionicons name="arrow-forward" size={17} color="white" />
               </LinearGradient>
@@ -569,6 +623,8 @@ const PLANS = [
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Onboarding() {
+  const { isDark } = useTheme();
+  applyOnbTheme(isDark); // rebuild module styles before any child renders
   const insets = useSafeAreaInsets();
   const { updateUser } = useHera();
   const { purchasePlan } = useSubscription();
@@ -714,12 +770,13 @@ export default function Onboarding() {
     try { stopAudioNow(); } catch {}
     const userName   = name.trim() || 'Beautiful Soul';
     const goalsArr   = goals.trim() ? [goals.trim()] : [];
-    const userRecord = { name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, streak: 1 };
+    const profile = { location, age, sexuality, gender, kids, motivation, obstacles, relationship, career, workSentiment, selfDesc, pastShapes, dreamLocation, homeType, partnerManifest, specificPerson };
+    const userRecord = { name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, streak: 1, profile };
     await Promise.all([
       AsyncStorage.setItem('@hera_user', JSON.stringify(userRecord)),
       AsyncStorage.setItem('hera_onboarded', 'true'),
     ]).catch(() => {});
-    updateUser({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true });
+    updateUser({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, profile });
     if (dest === '/subscription') {
       // Push (not replace) so the sign-in gate's back button is a real back
       // navigation that returns to this exact onboarding page.
@@ -729,7 +786,7 @@ export default function Onboarding() {
       setLastOnboardingScreen(1);
       router.replace(dest);
     }
-  }, [name, goals, updateUser, stopAudioNow]);
+  }, [name, goals, location, age, sexuality, gender, kids, motivation, obstacles, relationship, career, workSentiment, selfDesc, pastShapes, dreamLocation, homeType, partnerManifest, specificPerson, updateUser, stopAudioNow]);
 
   const finishOnboarding = useCallback(() => persistAndNavigate('/(tabs)'),    [persistAndNavigate]);
   const handleStartTrial = useCallback(() => persistAndNavigate('/subscription'), [persistAndNavigate]);
@@ -744,13 +801,16 @@ export default function Onboarding() {
   if (screen === 2) {
     return (
       <View style={{ flex: 1 }}>
-        <LinearGradient colors={['#080A18', '#0D1035', '#131838']} style={{ flex: 1, paddingTop: insets.top }}>
+        <LinearGradient colors={[T('#080A18'), T('#0D1035'), T('#131838')]} style={{ flex: 1, paddingTop: insets.top }}>
           <ScrollView contentContainerStyle={[ws.scroll, { paddingBottom: 16 }]} showsVerticalScrollIndicator={false}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <Pressable onPress={stopAndGoBack} style={ws.backBtn} hitSlop={12}>
-                <Ionicons name="arrow-back" size={18} color="rgba(255,255,255,0.45)" />
+                <Ionicons name="arrow-back" size={18} color={T('rgba(255,255,255,0.45)')} />
               </Pressable>
-              <MuteBtn isMuted={isMuted} onToggle={toggleMute} />
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <ThemeBtn />
+                <MuteBtn isMuted={isMuted} onToggle={toggleMute} />
+              </View>
             </View>
             <View style={ws.hero}>
               <Image source={require('@/assets/images/logo.png')} style={ws.logo} contentFit="contain" transition={300} />
@@ -777,7 +837,7 @@ export default function Onboarding() {
               <Text style={{ fontSize: FontSize.sm, color: Colors.textSubtle, marginLeft: 4 }}>4.9 · 12,400+ reviews</Text>
             </View>
             <Pressable onPress={stopAndGoNext} style={({ pressed }) => [ws.btnWrap, pressed && { opacity: 0.85 }]}>
-              <LinearGradient colors={['#A855F7', '#EC4899']} style={ws.btn}>
+              <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={ws.btn}>
                 <Text style={ws.btnTxt}>Continue</Text>
                 <Ionicons name="arrow-forward" size={17} color="white" />
               </LinearGradient>
@@ -827,8 +887,8 @@ export default function Onboarding() {
       <View style={{ flex: 1 }}>
         <QuestionLayout qNum={1} title={`Hello! Welcome to Hera.\n\nThis is your space to manifest the life of your dreams.`} onBack={goBack} onNext={goNext} canNext={true} isMuted={isMuted} onToggleMute={toggleMute}>
           <View style={{ borderRadius: Radius.xl, overflow: 'hidden' }}>
-            <LinearGradient colors={['rgba(168,85,247,0.2)', 'rgba(109,40,217,0.1)']} style={{ padding: Spacing.lg }}>
-              <Text style={{ fontSize: FontSize.base, color: 'rgba(255,255,255,0.8)', lineHeight: 22, fontStyle: 'italic' }}>
+            <LinearGradient colors={[T('rgba(168,85,247,0.2)'), T('rgba(109,40,217,0.1)')]} style={{ padding: Spacing.lg }}>
+              <Text style={{ fontSize: FontSize.base, color: T('rgba(255,255,255,0.8)'), lineHeight: 22, fontStyle: 'italic' }}>
                 Your journey to transformation starts here
               </Text>
             </LinearGradient>
@@ -957,9 +1017,9 @@ export default function Onboarding() {
       const goalsArr = goals.trim() ? [goals.trim()] : [];
       AsyncStorage.setItem(
         '@hera_user',
-        JSON.stringify({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, streak: 1 })
+        JSON.stringify({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, streak: 1, profile: { location, age, sexuality, gender, kids, motivation, obstacles, relationship, career, workSentiment, selfDesc, pastShapes, dreamLocation, homeType, partnerManifest, specificPerson } })
       ).catch(() => {});
-      updateUser({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true });
+      updateUser({ name: userName, goals: goalsArr, focusAreas: [], onboardingComplete: true, profile: { location, age, sexuality, gender, kids, motivation, obstacles, relationship, career, workSentiment, selfDesc, pastShapes, dreamLocation, homeType, partnerManifest, specificPerson } });
       goNext();
     };
     return (
@@ -990,7 +1050,7 @@ export default function Onboarding() {
 
   return (
     <View style={{ flex: 1 }}>
-      <LinearGradient colors={['#080A18', '#0D1035', '#131838']} style={{ flex: 1, paddingTop: insets.top }}>
+      <LinearGradient colors={[T('#080A18'), T('#0D1035'), T('#131838')]} style={{ flex: 1, paddingTop: insets.top }}>
         {/* Back to the last question — breaks the paywall ↔ sign-in loop */}
         <Pressable
           onPress={() => setScreen(23)}
@@ -998,7 +1058,7 @@ export default function Onboarding() {
           accessibilityLabel="Back to questions"
           style={[ws.backBtn, { marginLeft: Spacing.lg, marginTop: Spacing.sm }]}
         >
-          <Ionicons name="arrow-back" size={18} color="rgba(255,255,255,0.45)" />
+          <Ionicons name="arrow-back" size={18} color={T('rgba(255,255,255,0.45)')} />
         </Pressable>
         <ScrollView
           contentContainerStyle={[pw.scroll, { paddingBottom: insets.bottom + 140 }]}
@@ -1056,7 +1116,7 @@ export default function Onboarding() {
               onPress={() => setSelectedPlan(plan.id)}
               style={({ pressed }) => [pw.plan, plan.highlight && pw.planHL, selectedPlan === plan.id && pw.planSel, pressed && { opacity: 0.88 }]}
             >
-              {plan.highlight ? <LinearGradient colors={['rgba(168,85,247,0.1)', 'rgba(236,72,153,0.05)']} style={StyleSheet.absoluteFill} /> : null}
+              {plan.highlight ? <LinearGradient colors={[T('rgba(168,85,247,0.1)'), T('rgba(236,72,153,0.05)')]} style={StyleSheet.absoluteFill} /> : null}
               <View style={{ flex: 1, gap: 3 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={[pw.planName, selectedPlan === plan.id && { color: Colors.textWhite }]}>{plan.label}</Text>
@@ -1101,7 +1161,7 @@ export default function Onboarding() {
             onPress={handleStartTrial}
             style={({ pressed }) => [pw.ctaWrap, pressed && { opacity: 0.75 }]}
           >
-            <LinearGradient colors={['#A855F7', '#EC4899']} style={pw.ctaBtn}>
+            <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={pw.ctaBtn}>
               <Ionicons name="sparkles" size={17} color="white" />
               <Text style={pw.ctaTxt}>View My Plan Options</Text>
             </LinearGradient>
@@ -1120,7 +1180,7 @@ export default function Onboarding() {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
-const ws = StyleSheet.create({
+const make_ws = () => StyleSheet.create({
   scroll: { paddingHorizontal: Spacing.lg, gap: Spacing.md, paddingTop: Spacing.lg },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.glassBg, borderWidth: 1, borderColor: Colors.glassBorder, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   hero: { alignItems: 'center', gap: Spacing.md, marginTop: Spacing.sm },
@@ -1135,22 +1195,24 @@ const ws = StyleSheet.create({
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 17 },
   btnTxt: { fontSize: FontSize.md, color: 'white', fontWeight: '800' },
   appleWrap: { borderRadius: Radius.xxl, overflow: 'hidden' },
-  apple: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 15, borderRadius: Radius.xxl, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.06)' },
+  apple: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 15, borderRadius: Radius.xxl, borderWidth: 1.5, borderColor: T('rgba(255,255,255,0.2)'), backgroundColor: T('rgba(255,255,255,0.06)') },
   appleTxt: { fontSize: FontSize.base, color: Colors.textWhite, fontWeight: '700' },
   legal: { fontSize: FontSize.xs, color: Colors.textSubtle, textAlign: 'center', lineHeight: 18 },
   legalLink: { color: Colors.primaryLight, fontWeight: '600' },
-  fixedLoginBar: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)', backgroundColor: 'rgba(8,10,24,0.96)', paddingTop: 10, paddingHorizontal: Spacing.lg },
-  loginLink: { alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.xl, borderWidth: 1, borderColor: 'rgba(168,85,247,0.35)', backgroundColor: 'rgba(168,85,247,0.08)' },
-  loginLinkTxt: { fontSize: FontSize.sm, color: 'rgba(192,132,252,0.75)', textAlign: 'center' },
+  fixedLoginBar: { borderTopWidth: 1, borderTopColor: T('rgba(255,255,255,0.07)'), backgroundColor: T('rgba(8,10,24,0.96)'), paddingTop: 10, paddingHorizontal: Spacing.lg },
+  loginLink: { alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: Radius.xl, borderWidth: 1, borderColor: T('rgba(168,85,247,0.35)'), backgroundColor: T('rgba(168,85,247,0.08)') },
+  loginLinkTxt: { fontSize: FontSize.sm, color: T('rgba(192,132,252,0.75)'), textAlign: 'center' },
   loginLinkBold: { fontWeight: '700', color: Colors.primaryLight },
 });
+let ws = make_ws();
 
-const rf = StyleSheet.create({
+const make_rf = () => StyleSheet.create({
   input: { backgroundColor: Colors.glassBg, borderWidth: 1.5, borderColor: Colors.borderGold, borderRadius: Radius.xl, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, fontSize: FontSize.xl, color: Colors.gold, textAlign: 'center', fontWeight: '700', letterSpacing: 3 },
 });
+let rf = make_rf();
 
-const il = StyleSheet.create({
-  conf: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, backgroundColor: 'rgba(168,85,247,0.14)', borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: Spacing.lg },
+const make_il = () => StyleSheet.create({
+  conf: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, backgroundColor: T('rgba(168,85,247,0.14)'), borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: Spacing.lg },
   confTxt: { flex: 1, fontSize: FontSize.base, color: Colors.textMuted, lineHeight: 22 },
   chip: { backgroundColor: Colors.glassPurple, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: Spacing.md, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 5 },
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.glassPurple },
@@ -1158,20 +1220,21 @@ const il = StyleSheet.create({
   subQLine: { flex: 1, height: 1, backgroundColor: Colors.glassBorder },
   subQTxt: { fontSize: FontSize.sm, color: Colors.textSubtle, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
 });
+let il = make_il();
 
-const pw = StyleSheet.create({
+const make_pw = () => StyleSheet.create({
   scroll: { paddingHorizontal: Spacing.lg, gap: Spacing.lg, paddingTop: Spacing.xl },
   header: { alignItems: 'center', gap: Spacing.md },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.glassGold, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.borderGold, paddingHorizontal: Spacing.md, paddingVertical: 6 },
   badgeTxt: { fontSize: FontSize.xs, color: Colors.gold, fontWeight: '800', letterSpacing: 1 },
   title: { fontSize: FontSize.xxl, color: Colors.textWhite, fontWeight: '800', textAlign: 'center', lineHeight: 36 },
   sub: { fontSize: FontSize.base, color: Colors.textMuted, textAlign: 'center', lineHeight: 24 },
-  note: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, backgroundColor: 'rgba(168,85,247,0.18)', borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md },
-  noteTxt: { flex: 1, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.75)', lineHeight: 20 },
-  promiseRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: Radius.xl, borderWidth: 1, borderColor: 'rgba(16,185,129,0.2)', paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm },
+  note: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md, backgroundColor: T('rgba(168,85,247,0.18)'), borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md },
+  noteTxt: { flex: 1, fontSize: FontSize.sm, color: T('rgba(255,255,255,0.75)'), lineHeight: 20 },
+  promiseRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: T('rgba(16,185,129,0.08)'), borderRadius: Radius.xl, borderWidth: 1, borderColor: T('rgba(16,185,129,0.2)'), paddingVertical: Spacing.md, paddingHorizontal: Spacing.sm },
   planLabel: { fontSize: FontSize.xs, color: Colors.textSubtle, fontWeight: '700', letterSpacing: 1.2 },
   plan: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.xl, borderWidth: 1.5, borderColor: Colors.glassBorder, backgroundColor: Colors.glassBg, paddingVertical: Spacing.md, paddingHorizontal: Spacing.lg, overflow: 'hidden' },
-  planHL: { borderColor: 'rgba(168,85,247,0.4)' },
+  planHL: { borderColor: T('rgba(168,85,247,0.4)') },
   planSel: { borderColor: Colors.gold, borderWidth: 2 },
   planName: { fontSize: FontSize.base, color: Colors.textMuted, fontWeight: '700' },
   planBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: Radius.full, borderWidth: 1 },
@@ -1181,17 +1244,38 @@ const pw = StyleSheet.create({
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.gold },
   reminderBox: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Colors.glassBg, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.glassBorder, padding: Spacing.md },
   reminderTxt: { flex: 1, fontSize: FontSize.xs, color: Colors.textSubtle, lineHeight: 18 },
-  teamNote: { backgroundColor: 'rgba(168,85,247,0.08)', borderRadius: Radius.xl, borderWidth: 1, borderColor: 'rgba(168,85,247,0.22)', padding: Spacing.lg, gap: Spacing.sm },
+  teamNote: { backgroundColor: T('rgba(168,85,247,0.08)'), borderRadius: Radius.xl, borderWidth: 1, borderColor: T('rgba(168,85,247,0.22)'), padding: Spacing.lg, gap: Spacing.sm },
   teamNoteHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   teamNoteTitle: { fontSize: FontSize.sm, color: Colors.primaryLight, fontWeight: '700' },
-  teamNoteTxt: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.72)', lineHeight: 21 },
+  teamNoteTxt: { fontSize: FontSize.sm, color: T('rgba(255,255,255,0.72)'), lineHeight: 21 },
   teamSig: { fontSize: FontSize.xs, color: Colors.textSubtle, fontStyle: 'italic', textAlign: 'right' },
-  cta: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, gap: Spacing.sm, backgroundColor: 'rgba(8,10,24,0.96)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.07)' },
+  cta: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, gap: Spacing.sm, backgroundColor: T('rgba(8,10,24,0.96)'), borderTopWidth: 1, borderTopColor: T('rgba(255,255,255,0.07)') },
   ctaWrap: { borderRadius: Radius.xxl, overflow: 'hidden', ...Shadow.gold },
   ctaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 17 },
   ctaTxt: { fontSize: FontSize.base, color: 'white', fontWeight: '800' },
   ctaLegal: { fontSize: FontSize.xs, color: Colors.textSubtle, textAlign: 'center' },
   footerLinks: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingBottom: 4 },
-  footerLink: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.3)', textDecorationLine: 'underline' },
-  footerDot: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.2)' },
+  footerLink: { fontSize: FontSize.xs, color: T('rgba(255,255,255,0.3)'), textDecorationLine: 'underline' },
+  footerDot: { fontSize: FontSize.xs, color: T('rgba(255,255,255,0.2)') },
 });
+let pw = make_pw();
+
+// Rebuild every onboarding StyleSheet for the active theme
+function applyOnbTheme(dark: boolean) {
+  if (dark === IS_DARK) return;
+  IS_DARK = dark;
+  Colors = dark ? DarkColors : LightColors;
+  oc = make_oc();
+  yn = make_yn();
+  hg = make_hg();
+  acm = make_acm();
+  si = make_si();
+  ql = make_ql();
+  mb = make_mb();
+  spl = make_spl();
+  gs = make_gs();
+  ws = make_ws();
+  rf = make_rf();
+  il = make_il();
+  pw = make_pw();
+}
