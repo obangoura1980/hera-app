@@ -19,7 +19,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1E0A3C"
       },
-      "package": "com.emergent.manifestdreams.qc3zvj"
+      "package": "com.hera.herapp"
     },
     "web": {
       "bundler": "metro",

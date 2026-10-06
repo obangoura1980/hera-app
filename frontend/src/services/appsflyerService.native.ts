@@ -1,31 +1,35 @@
 /**
- * appsflyerService — AppsFlyer attribution/analytics (native).
+ * appsflyerService — AppsFlyer attribution/analytics (native, iOS + Android).
+ * react-native-appsflyer v7 API (Promise-based RPC: init → start, logEvent).
  * Initialized once at app launch; events are fire-and-forget and must never
  * break auth or purchase flows.
+ *
+ * Platforms:
+ *  - iOS:     identified by devKey + Apple App ID (6801563533)
+ *  - Android: identified by devKey + the build's package name (com.hera.herapp,
+ *             set in app.json android.package) — the SDK reads it automatically.
  */
 import appsFlyer from 'react-native-appsflyer';
+import { Platform } from 'react-native';
 
 const DEV_KEY = 'cyVDRB8MLP49vNiTAa4LRN';
-const IOS_APP_ID = '6801563533';
+const IOS_APP_ID = '6801563533';   // Apple App ID (numbers only)
+export const ANDROID_PACKAGE = 'com.hera.herapp'; // informational — taken from app.json at build time
 
 let initPromise: Promise<void> | undefined;
 
 export function initAppsFlyer(): Promise<void> {
   if (initPromise) return initPromise;
 
-  initPromise = new Promise((resolve, reject) => {
-    appsFlyer.initSdk(
-      {
-        devKey: DEV_KEY,
-        appId: IOS_APP_ID,
-        isDebug: __DEV__,
-        onInstallConversionDataListener: false,
-        onDeepLinkListener: false,
-      },
-      () => resolve(),
-      (error) => reject(error),
-    );
-  });
+  initPromise = (async () => {
+    if (__DEV__) await appsFlyer.enableDebug({ enabled: true });
+    await appsFlyer.init({
+      devKey: DEV_KEY,
+      appId: Platform.OS === 'ios' ? IOS_APP_ID : null, // Android resolves via package name
+    });
+    await appsFlyer.start();
+    if (__DEV__) console.log(`[AppsFlyer] SDK initialized (${Platform.OS})`);
+  })();
 
   return initPromise;
 }
@@ -40,15 +44,7 @@ export async function logAppsFlyerEvent(
   values: Record<string, string | number | boolean | null> = {},
 ): Promise<void> {
   await initAppsFlyer();
-
-  return new Promise((resolve, reject) => {
-    appsFlyer.logEvent(
-      name,
-      values,
-      () => resolve(),
-      (error) => reject(error),
-    );
-  });
+  await appsFlyer.logEvent({ eventName: name, eventValues: values });
 }
 
 /** Fire-and-forget wrapper — analytics failures are logged, never thrown. */

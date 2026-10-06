@@ -12,7 +12,8 @@ This file serves as memory for interacting with the user's RevenueCat account vi
   - $rc_annual  -> prod48d640878f   (Test Store: $79.99 / P1Y, trial: none)
 - NOTE (2026-10-04): Test Store prices/trial are IMMUTABLE once a product has transactions — /products upsert returns 200 but does not change them; DELETE fails with "Could not delete product because it has transactions". Intended PRODUCTION pricing is $12.99/mo and $89.99/yr with a 7-day free trial (P1W) — these are configured STORE-SIDE (App Store Connect subscription price + introductory offer; Play Console base plan price + free trial) when the user creates pro.monthly / pro.annual. Subscription prices and trials ALWAYS live in the stores; RevenueCat reflects them.
 - Dashboard: https://app.revenuecat.com/projects/proj5cf7090a
-- bundle_id / package_name: com.emergent.manifestdreams.qc3zvj (app.json)
+- bundle_id: com.emergent.manifestdreams.qc3zvj (iOS, app.json)
+- package_name: com.hera.herapp (Android, app.json — changed 2026-10-06 for AppsFlyer; /setup re-run with it)
 
 ## Status check
 `curl -sS -H "Authorization: Bearer <emergent key from playbook>" "$INTEGRATION_PROXY_URL/internal/revenuecat/projects/134257bb-ac6c-4253-88d7-c4cbab316e61/status"`
