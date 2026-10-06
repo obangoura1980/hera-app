@@ -2,6 +2,7 @@
 // The original OnSpace code calls `getSupabaseClient()`; this keeps that API
 // surface while routing auth, subscription and account calls to /api.
 import { api, loadToken, setToken } from "@/src/api";
+import { trackAppsFlyerEvent } from "@/src/services/appsflyerService";
 
 type Listener = (event: string, session: any) => void;
 const listeners = new Set<Listener>();
@@ -71,6 +72,10 @@ const client = {
       try {
         const r: any = await api("/auth/otp/verify", { method: "POST", body: { email, code: token } });
         await setSession(r.access_token, r.user);
+        // Analytics: first-time OTP verify = registration, otherwise login.
+        // Fire-and-forget — analytics must never break auth.
+        if (r.is_new) trackAppsFlyerEvent("af_complete_registration", { af_registration_method: "otp" });
+        else trackAppsFlyerEvent("af_login", { af_login_method: "otp" });
         return ok({ user: toUser(r.user), session: { access_token: r.access_token, user: toUser(r.user) } });
       } catch (e: any) {
         return fail(e.message);

@@ -59,7 +59,14 @@
         }
       ],
       "@react-native-vector-icons/ionicons",
-      "@react-native-vector-icons/material-icons"
+      "@react-native-vector-icons/material-icons",
+      [
+        "react-native-appsflyer",
+        {
+          "shouldUseStrictMode": false,
+          "preferAppsFlyerBackupRules": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 
 import { api, ApiError, loadToken, setToken, type User } from "@/src/api";
 import { queryClient } from "@/src/query-client";
+import { trackAppsFlyerEvent } from "@/src/services/appsflyerService";
 
 type AuthCtx = {
   user: User | null;
@@ -39,8 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string) =>
-      handleAuth(await api("/auth/login", { method: "POST", body: { email, password } })),
+    async (email: string, password: string) => {
+      const res = await api("/auth/login", { method: "POST", body: { email, password } });
+      await handleAuth(res);
+      // Analytics — successful sign-in only, fire-and-forget
+      trackAppsFlyerEvent("af_login", { af_login_method: "password" });
+    },
     [handleAuth],
   );
 

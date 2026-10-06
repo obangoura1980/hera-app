@@ -794,6 +794,7 @@ async def otp_verify(data: OtpVerifyIn):
         raise HTTPException(400, "Invalid code")
     await db.otps.delete_many({"email": email})
     doc = await db.users.find_one({"email": email})
+    is_new = doc is None
     if not doc:
         pw = bcrypt.hashpw(uuid.uuid4().hex.encode(), bcrypt.gensalt()).decode()
         user = User(email=email, name=email.split("@")[0].title(), password_hash=pw)
@@ -801,7 +802,7 @@ async def otp_verify(data: OtpVerifyIn):
         user.id = str(res.inserted_id)
     else:
         user = User.from_mongo(doc)
-    return {"access_token": make_token(user.id), "token_type": "bearer", "user": user.public()}
+    return {"access_token": make_token(user.id), "token_type": "bearer", "user": user.public(), "is_new": is_new}
 
 
 # Accounts that always get premium without payment (app owner / internal testing)

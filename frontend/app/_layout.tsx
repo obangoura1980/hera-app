@@ -10,6 +10,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { initNotifications } from '@/services/notificationService';
+import { initAppsFlyer } from '@/src/services/appsflyerService';
 import { useFonts } from 'expo-font';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { OfflineNotice } from '@/components/OfflineNotice';
@@ -31,6 +32,10 @@ function AppContent() {
 
   useEffect(() => {
     initNotifications().catch(() => {});
+    // AppsFlyer — init once at app launch (native only; no-op on web)
+    initAppsFlyer().catch((error) => {
+      if (__DEV__) console.warn('AppsFlyer initialization failed', error);
+    });
   }, []);
 
   if (isLoading) {

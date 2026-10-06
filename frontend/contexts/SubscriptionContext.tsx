@@ -16,6 +16,7 @@ import AsyncStorage from '@/src/utils/async-storage';
 import { useAuth, useAlert } from '@/template';
 import { api } from '@/src/api';
 import { useRCSubscription, rcEnabled, rcLogIn, rcLogOut, REVENUECAT_ENTITLEMENT_IDENTIFIER } from '@/src/lib/revenuecat';
+import { trackAppsFlyerEvent } from '@/src/services/appsflyerService';
 import { PaywallModal } from '@/components/feature/PaywallModal';
 import type { IAPSubscription } from '@/services/iapService';
 
@@ -122,7 +123,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const entitlement = rc.customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER];
   const rcSubscribed = !!entitlement;
   const isSubscribed = rcSubscribed || serverBypass;
-  const isTrial = entitlement?.periodType === 'trial';
+  const isTrial = String(entitlement?.periodType ?? '').toUpperCase() === 'TRIAL';
   const subscriptionEnd = entitlement?.expirationDate ?? null;
 
   const packages = rc.offerings?.current?.availablePackages ?? [];
@@ -182,9 +183,18 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       const customerInfo = await rc.purchase(pkg);
       const active = !!customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER];
       if (!active) return; // listener will update state; no nav until entitlement is live
+      const trialActive = String(customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_IDENTIFIER]?.periodType ?? '').toUpperCase() === 'TRIAL';
+      if (trialActive) {
+        // Analytics — trial started, fire-and-forget (never block the flow)
+        trackAppsFlyerEvent('af_start_trial', {
+          af_content_id: pkg.product.identifier,
+          af_content_type: 'trial',
+          trial_length: 7,
+        });
+      }
       showAlert(
         'Welcome to Hera Premium! 🌟',
-        customerInfo.entitlements.active[REVENUECAT_ENTITLEMENT_IDENTIFIER]?.periodType === 'trial'
+        trialActive
           ? 'Your 7-day free trial has started. Enjoy unlimited access!'
           : 'Subscription activated. Enjoy unlimited access!',
       );
