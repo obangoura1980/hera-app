@@ -11,7 +11,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.manifestdreams.qc3zvj",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board"
+        "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board",
+        "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera"
       }
     },
     "android": {
@@ -64,6 +65,7 @@
         "react-native-appsflyer",
         {
           "shouldUseStrictMode": false,
+          "shouldUsePurchaseConnector": false,
           "preferAppsFlyerBackupRules": false
         }
       ]

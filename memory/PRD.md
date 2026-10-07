@@ -75,3 +75,12 @@
 - Journal: detail sheet height fix, mood label one line; ambient music never auto-plays, pauses on leaving Discover
 - Chat: reset (refresh) icon; offline top toast; sync icon blink fixed
 - RevenueCat deferred by user (demo trial still mocked)
+
+## Update (2026-09) — Android EAS build fix (AppsFlyer Kotlin conflict)
+- EAS Android build failed at :react-native-appsflyer:compileReleaseKotlin (7.0.2-v2 built with Kotlin 2.4 metadata vs EAS Kotlin 2.1)
+- Pinned react-native-appsflyer@6.18.0 (via yarn expo install); service rewritten to v6 API (initSdk/startSdk/positional logEvent), same exported interface
+- AppsFlyer dev key + iOS app id moved from source to frontend/.env (EXPO_PUBLIC_APPSFLYER_DEV_KEY / EXPO_PUBLIC_APPSFLYER_IOS_APP_ID)
+- Added NSUserTrackingUsageDescription to ios.infoPlist; added shouldUsePurchaseConnector:false to appsflyer plugin options
+- Added GET /health to backend (deployment probes were getting 404)
+- Deployment agent re-check: no blockers; warns remain (placeholder legal copy, mocked cloud sync)
+- PENDING: user must redeploy via Emergent Publish to verify the Android build now completes; then native AppsFlyer event validation on device

@@ -869,6 +869,11 @@ async def hera_chat(data: HeraChatIn, creds: Optional[HTTPAuthorizationCredentia
 
 
 app.include_router(api)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
