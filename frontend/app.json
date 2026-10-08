@@ -68,7 +68,8 @@
           "shouldUsePurchaseConnector": false,
           "preferAppsFlyerBackupRules": false
         }
-      ]
+      ],
+      "./plugins/withAndroidBackupRulesFix"
     ],
     "experiments": {
       "typedRoutes": true

@@ -84,3 +84,10 @@
 - Added GET /health to backend (deployment probes were getting 404)
 - Deployment agent re-check: no blockers; warns remain (placeholder legal copy, mocked cloud sync)
 - PENDING: user must redeploy via Emergent Publish to verify the Android build now completes; then native AppsFlyer event validation on device
+
+## Update (2026-09) — Android EAS build fix #2 (manifest merger conflict)
+- After AppsFlyer 6.18.0 pin, build progressed past Kotlin but failed at :app:processReleaseMainManifest
+- Cause: expo-secure-store's backup rules (secure_store_backup_rules / secure_store_data_extraction_rules) conflict with af-android-sdk's appsflyer_backup_rules / appsflyer_data_extraction_rules on <application>
+- Fix: custom config plugin frontend/plugins/withAndroidBackupRulesFix.js adds tools:replace="android:dataExtractionRules,android:fullBackupContent" keeping secure-store rules (NOT preferAppsFlyerBackupRules=true, which would delete them); listed last in app.json plugins
+- Verified locally: expo prebuild --platform android --no-install succeeds; generated AndroidManifest.xml has tools:replace on <application> + secure-store rules retained, XML parses; android/ dir and package.json prebuild side-effects cleaned up
+- PENDING: user redeploy via Emergent Publish to confirm the EAS build completes end-to-end
