@@ -70,6 +70,17 @@ function useSubscriptionContext() {
     queryFn: () => Purchases.getOfferings(),
     enabled: rcEnabled,
     staleTime: 300 * 1000,
+    // Store product catalogs can lag on cold start — retry with backoff
+    // before letting the paywall conclude options are unavailable.
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    // getOfferings() can RESOLVE with an empty package list (products being
+    // propagated / dashboard reconfiguration) — react-query retry only fires
+    // on rejections, so poll gently until packages appear.
+    refetchInterval: (query) => {
+      const pkgs = query.state.data?.current?.availablePackages ?? [];
+      return pkgs.length === 0 ? 15000 : false;
+    },
   });
 
   // Reactive entitlement updates — the SDK pushes fresh CustomerInfo after
@@ -117,6 +128,7 @@ function useSubscriptionContext() {
     isPurchasing: purchaseMutation.isPending,
     isRestoring: restoreMutation.isPending,
     refetchCustomerInfo: customerInfoQuery.refetch,
+    refetchOfferings: offeringsQuery.refetch,
   };
 }
 

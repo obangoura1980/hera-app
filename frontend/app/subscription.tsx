@@ -52,8 +52,9 @@ function TrialSummaryStep({
 }) {
   const insets = useSafeAreaInsets();
   const { isDark, colors: c } = useTheme();
-  const { iapProducts, restoreSubscription, isLoading, statusLoaded } = useSubscription();
+  const { iapProducts, restoreSubscription, isLoading, statusLoaded, refetchOfferings } = useSubscription();
   const { user: authUser } = useAuth();
+  const [retryingOfferings, setRetryingOfferings] = useState(false);
 
   const monthlyProduct = useMemo(() => iapProducts.find(p => p.productId === IAP_SKUS.monthly), [iapProducts]);
   const yearlyProduct  = useMemo(() => iapProducts.find(p => p.productId === IAP_SKUS.yearly),  [iapProducts]);
@@ -218,9 +219,27 @@ function TrialSummaryStep({
         />
         <View style={ts.ctaInner}>
           {statusLoaded && iapProducts.length === 0 ? (
-            <Text style={[ts.ctaSub, { color: bodyColor, textAlign: 'center' }]}>
-              Subscription options are unavailable right now. Please try again later.
-            </Text>
+            <Pressable
+              disabled={retryingOfferings}
+              onPress={async () => {
+                setRetryingOfferings(true);
+                try { await refetchOfferings(); } catch {}
+                setRetryingOfferings(false);
+              }}
+              style={({ pressed }) => [{ alignItems: 'center', gap: 6, paddingVertical: 4 }, pressed && { opacity: 0.7 }]}
+            >
+              {retryingOfferings ? (
+                <ActivityIndicator color={isDark ? '#C084FC' : '#C4707A'} />
+              ) : (
+                <Ionicons name="refresh" size={18} color={isDark ? '#C084FC' : '#C4707A'} />
+              )}
+              <Text style={[ts.ctaSub, { color: bodyColor, textAlign: 'center' }]}>
+                Subscription options are unavailable right now.
+              </Text>
+              <Text style={[ts.ctaSub, { color: isDark ? '#C084FC' : '#C4707A', fontWeight: '700' }]}>
+                {retryingOfferings ? 'Checking…' : 'Tap to retry'}
+              </Text>
+            </Pressable>
           ) : (
           <Pressable
             onPress={onNext}

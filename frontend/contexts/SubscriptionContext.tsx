@@ -50,6 +50,7 @@ interface SubscriptionContextType {
   statusLoaded:   boolean;
   // Actions
   checkSubscription:  () => Promise<void>;
+  refetchOfferings:   () => Promise<unknown>;
   purchasePlan:       (productKey: 'monthly' | 'yearly') => Promise<void>;
   restoreSubscription: () => Promise<void>;
   incrementChatCount: () => void;
@@ -168,7 +169,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // ── Purchase a plan ─────────────────────────────────────────────────────────
   const purchasePlan = useCallback(async (productKey: 'monthly' | 'yearly') => {
     const identifier = productKey === 'yearly' ? '$rc_annual' : '$rc_monthly';
-    const pkg = (rc.offerings?.current?.availablePackages ?? []).find(p => p.identifier === identifier);
+    let pkg = (rc.offerings?.current?.availablePackages ?? []).find(p => p.identifier === identifier);
+    if (!pkg) {
+      // Catalog may have lagged on cold start — one live refresh before giving up
+      try {
+        const refreshed = await rc.refetchOfferings();
+        pkg = (refreshed.data?.current?.availablePackages ?? []).find(p => p.identifier === identifier);
+      } catch {}
+    }
     if (!pkg) {
       showAlert('Unavailable', 'Subscription options are unavailable right now. Please try again later.');
       return;
@@ -281,6 +289,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       iapProducts,
       statusLoaded,
       checkSubscription,
+      refetchOfferings: rc.refetchOfferings,
       purchasePlan,
       restoreSubscription,
       incrementChatCount,
