@@ -3,8 +3,8 @@ This file serves as memory for interacting with the user's RevenueCat account vi
 
 ## Identifiers (from /setup response — copy verbatim)
 - rc_project_id: proj5cf7090a
-- apple_app_id: appb3cae346b2
-- play_app_id: appaad0eb062e
+- apple_app_id: app8070880860   # updated 2026-10-08 with new keys
+- play_app_id: appe751ded2e4    # updated 2026-10-08 with new keys
 - entitlement_lookup_key: pro
 - offering_lookup_key: default
 - Packages (package -> product_id, current price):
