@@ -91,3 +91,10 @@
 - Fix: custom config plugin frontend/plugins/withAndroidBackupRulesFix.js adds tools:replace="android:dataExtractionRules,android:fullBackupContent" keeping secure-store rules (NOT preferAppsFlyerBackupRules=true, which would delete them); listed last in app.json plugins
 - Verified locally: expo prebuild --platform android --no-install succeeds; generated AndroidManifest.xml has tools:replace on <application> + secure-store rules retained, XML parses; android/ dir and package.json prebuild side-effects cleaned up
 - PENDING: user redeploy via Emergent Publish to confirm the EAS build completes end-to-end
+
+## Update (2026-10-13) — Permanent demo/reviewer account
+- demo@heraapp.com / HeraDemo2024! — seeded on every backend startup (idempotent upsert, is_premium=true), whitelisted in PREMIUM_BYPASS_EMAILS so full premium access without any purchase
+- Never deletable/resettable: DELETE /api/account and POST /api/account/reset return 403 for it; register with the email returns 409; password works from any location (no OTP dependency)
+- Login screen (app/login.tsx): entering the demo email switches to a "Demo Sign In" password stage (invisible to regular users, OTP flow unchanged); routes into the app with premium active
+- Testing agent iteration 29: 6/6 flows pass (demo detection, login, wrong password, back-to-email, OTP regression, premium access)
+- NOTE: production Atlas DB gets the seed only after the NEXT backend deploy — reviewer credentials go live on redeploy

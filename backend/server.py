@@ -317,6 +317,8 @@ USER_COLLECTIONS = ("journal", "goals", "coach_messages", "favorites", "activiti
 
 @api.post("/account/reset")
 async def reset_journey(user: User = Depends(current_user)):
+    if user.email == DEMO_EMAIL:
+        raise HTTPException(403, "The demo reviewer account cannot be reset")
     for name in USER_COLLECTIONS:
         await db[name].delete_many({"user_id": user.id})
     return {"ok": True}
@@ -324,6 +326,8 @@ async def reset_journey(user: User = Depends(current_user)):
 
 @api.delete("/account")
 async def delete_account(user: User = Depends(current_user)):
+    if user.email == DEMO_EMAIL:
+        raise HTTPException(403, "The demo reviewer account cannot be deleted")
     for name in USER_COLLECTIONS:
         await db[name].delete_many({"user_id": user.id})
     await db.files.update_many({"user_id": user.id}, {"$set": {"is_deleted": True}})
@@ -805,8 +809,13 @@ async def otp_verify(data: OtpVerifyIn):
     return {"access_token": make_token(user.id), "token_type": "bearer", "user": user.public(), "is_new": is_new}
 
 
-# Accounts that always get premium without payment (app owner / internal testing)
-PREMIUM_BYPASS_EMAILS = {"iaminamrana@gmail.com"}
+# Permanent demo account for store reviewers (Google Play / App Store review).
+# Password login (no OTP), premium via bypass below, never deletable/resettable.
+DEMO_EMAIL = "demo@heraapp.com"
+DEMO_PASSWORD = "HeraDemo2024!"
+
+# Accounts that always get premium without payment (app owner / internal testing / store reviewers)
+PREMIUM_BYPASS_EMAILS = {"iaminamrana@gmail.com", DEMO_EMAIL}
 
 
 @api.get("/subscription")
@@ -880,6 +889,19 @@ app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=["*"],
 @app.on_event("startup")
 async def startup():
     await db.users.create_index("email", unique=True)
+    # Seed the permanent reviewer/demo account. $setOnInsert keeps this
+    # idempotent: never overwrites the password on restart, recreates the
+    # account only if it is missing (unique email index guards races).
+    await db.users.update_one(
+        {"email": DEMO_EMAIL},
+        {"$setOnInsert": User(
+            email=DEMO_EMAIL,
+            name="Demo",
+            password_hash=bcrypt.hashpw(DEMO_PASSWORD.encode(), bcrypt.gensalt()).decode(),
+            is_premium=True,
+        ).to_mongo()},
+        upsert=True,
+    )
     try:
         init_storage()
         logger.info("Object storage ready")

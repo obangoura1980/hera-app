@@ -1,0 +1,44 @@
+{
+  "summary": "FRONTEND-ONLY test (mobile 390x844, public preview) of the store-reviewer demo account login flow. ALL 6 REQUESTED FLOWS PASS: (1) demo@heraapp.com on email stage -> switches to 'Demo Sign In' password stage, NO OTP sent, 'Use a different email' link visible. (2) Correct password HeraDemo2024! -> signInWithPassword -> POST /api/auth/login 200 -> navigated to /subscription, which then routed premium account straight to the tabs home screen ('/' — main app, no blocking paywall). (3) Wrong password 'nope' -> themed alert 'Sign In Failed' + exact message 'Incorrect email or password. Please try again.', stays on password stage after OK dismiss, password field cleared. (4) 'Use a different email' link returns to 'Welcome Back' email stage, password field removed. (5) REGRESSION PASS: delivered@resend.dev still goes through the OTP stage ('Check Your Email' + 4-digit code input + Resend cooldown) — OTP flow unaffected. (6) Premium confirmed: backend login response has is_premium:true (curl-verified this session: 200 + token), and post-login the app landed on the tabs home screen without a paywall block. Backend spot-checks also pass: wrong password -> 401 'Incorrect email or password'. No red screens, no broken navigation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ThemedAlert modal (login.tsx)", "issue": "MINOR/visual-only: in the wrong-password screenshot the alert title/message appear overlaid on the form without the dark card background clearly rendered — likely captured mid fade-animation (animationType='fade'). Alert is fully functional (readable, OK dismiss works). Non-blocking. Reference: /app/frontend/app/login.tsx:43-79.", "testID": "", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "testID coverage", "issue": "login.tsx interactive elements (email input, password input, Sign In button, 'Use a different email' link, OTP input, alert buttons) have NO testID props — automation relies on placeholder/exact-text matching. Reference: /app/frontend/app/login.tsx:427-496."},
+      {"component": "Web-preview console deprecation warnings", "issue": "'shadow*'/'textShadow*' style props deprecated (use boxShadow/textShadow), 'props.pointerEvents' deprecated, useNativeDriver fallback warning — pre-existing, web-preview only, non-blocking."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screenshots/iter29_email_stage.jpeg",
+    "/app/test_reports/screenshots/iter29_password_stage.jpeg",
+    "/app/test_reports/screenshots/iter29_wrong_password.jpeg",
+    "/app/test_reports/screenshots/iter29_after_login.jpeg",
+    "/app/test_reports/screenshots/iter29_otp_regression.jpeg"
+  ],
+  "action_items": [
+    "Optional: add testID props to login.tsx inputs/buttons/links (email-input, password-input, signin-button, use-different-email-link) for robust automation.",
+    "No fixes required — demo reviewer account flow works end-to-end as specified."
+  ],
+  "critical_code_review_comments": [
+    "login.tsx:278-283 demo-email intercept happens client-side BEFORE any network/Supabase call — verified no OTP request fires for demo@heraapp.com.",
+    "login.tsx:355-362 handlePasswordLogin uses signInWithPassword from template/auth/emergent.tsx:53-61 which POSTs /auth/login and setSession(access_token) — integration path confirmed working (session persisted, routed to /subscription then tabs).",
+    "Wrong-password path correctly surfaces backend 401 'Incorrect email or password' through friendlyAuthError (login.tsx:255) into the exact user-facing message.",
+    "returnTo param defaults to '/subscription' (login.tsx:216); premium server bypass means the paywall does not block — app landed on tabs home screen. Both acceptable per spec.",
+    "No deprecated expo-av / expo-barcode-scanner / expo-background-fetch usage in login.tsx.",
+    "Pre-existing (unchanged this iteration): RevenueCat Test Store offering still has empty packages (console '[Purchases] Empty offerings') — does NOT affect demo premium flow because premium comes from the server bypass, but real purchase testing remains blocked per iteration_28."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (spot-checks: demo login 200 + is_premium:true, wrong password 401)", "frontend": "100% (6/6 flows: password stage switch, successful login+nav, wrong-password alert, back-link, OTP regression, premium no-paywall entry)"},
+  "seed_data_creation": "None — used pre-seeded demo@heraapp.com and existing delivered@resend.dev. OTP was triggered for delivered@resend.dev (existence-check send) but never verified; no data created.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Demo reviewer flow fully working. Playwright selectors that work: email input = input[placeholder=\"you@example.com\"], password input = input[placeholder=\"Account password\"], Sign In button = get_by_text('Sign In', exact=True), OTP input = input[placeholder=\"• • • •\"], alert dismiss = get_by_text('OK', exact=True).last. Onboarding bypass init script: localStorage hera_onboarded='\"true\"' + __hera_keys='[\"hera_onboarded\"]'. Post-demo-login the app lands on '/' (tabs home) — this is the success state, not a bug.",
+  "rca_of_issue": "No issues found in the tested scope. Flow verified end-to-end: email stage -> demo-email client-side intercept -> password stage -> POST /api/auth/login (200, is_premium:true) -> session set -> /subscription -> premium bypass -> tabs home."
+}

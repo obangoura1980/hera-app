@@ -16,7 +16,10 @@ import { resetOnboardingProgress } from '@/src/onboarding-progress';
 import { Image } from 'expo-image';
 import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 
-type Stage = 'email' | 'otp';
+type Stage = 'email' | 'otp' | 'password';
+
+// Store-reviewer demo account — password sign-in (no OTP inbox exists for it)
+const DEMO_EMAIL = 'demo@heraapp.com';
 
 interface RemoteStats {
   journal: number;
@@ -194,7 +197,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c, isDark } = useTheme();
   const s = useMemo(() => createStyles(c), [c]);
-  const { sendOTP, verifyOTPAndLogin, operationLoading } = useAuth();
+  const { sendOTP, verifyOTPAndLogin, signInWithPassword, operationLoading } = useAuth();
   const [isCheckingExistence, setIsCheckingExistence] = useState(false);
   // Themed alert state
   const [alertVisible, setAlertVisible]   = useState(false);
@@ -216,6 +219,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [normalizedEmail, setNormalizedEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
   const [isCheckingCloud, setIsCheckingCloud] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -248,6 +252,7 @@ export default function LoginScreen() {
     if (lower.includes('invalid') && lower.includes('otp')) return 'The code you entered is incorrect. Please check the email and try again.';
     if (lower.includes('expired')) return 'The code has expired. Press "Resend code" to get a new one.';
     if (lower.includes('network') || lower.includes('fetch')) return 'Network error. Please check your connection and try again.';
+    if (lower.includes('incorrect')) return 'Incorrect email or password. Please try again.';
     return err;
   };
 
@@ -268,6 +273,14 @@ export default function LoginScreen() {
   const handleSendOTP = useCallback(async (overrideEmail?: string) => {
     const trimmed = (overrideEmail ?? email).trim().toLowerCase();
     if (!trimmed.includes('@') || !trimmed.includes('.')) { showAlert('Invalid Email', 'Please enter a valid email address.'); return; }
+
+    // Reviewer demo account — password sign-in instead of OTP
+    if (trimmed === DEMO_EMAIL && stage !== 'otp') {
+      setNormalizedEmail(trimmed);
+      setPassword('');
+      setStage('password');
+      return;
+    }
 
     // If this is a fresh email submission (not a resend), check whether the user exists first.
     // Use shouldCreateUser: false — Supabase returns an error for unknown emails.
@@ -338,6 +351,16 @@ export default function LoginScreen() {
     } finally { setIsCheckingCloud(false); }
   }, [otp, normalizedEmail, verifyOTPAndLogin, showAlert, lockSync, triggerSync, returnTo]);
 
+  // Reviewer demo account — password sign-in, then straight into the app
+  const handlePasswordLogin = useCallback(async () => {
+    if (!password) { showAlert('Enter password', 'Please enter the account password.'); return; }
+    lockSync();
+    const { error } = await signInWithPassword(normalizedEmail, password);
+    if (error) { setPassword(''); showAlert('Sign In Failed', friendlyAuthError(error)); return; }
+    triggerSync('local_only');
+    router.replace(returnTo as any);
+  }, [password, normalizedEmail, signInWithPassword, showAlert, lockSync, triggerSync, returnTo]);
+
   const bgColors = isDark ? (['#080A18', '#0F1025', '#131838'] as const) : (['#FDE8EA', '#F9D5D9', '#F5C2C7'] as const);
   const primaryGradient: [string, string] = isDark ? ['#A855F7', '#EC4899'] : [c.primary, c.primaryDark];
   const glowBg = isDark ? 'rgba(168,85,247,0.1)' : 'rgba(196,112,122,0.08)';
@@ -384,11 +407,13 @@ export default function LoginScreen() {
           </View>
 
           <View style={s.headingWrap}>
-            <Text style={s.title}>{stage === 'email' ? 'Welcome Back' : 'Check Your Email'}</Text>
+            <Text style={s.title}>{stage === 'email' ? 'Welcome Back' : stage === 'otp' ? 'Check Your Email' : 'Demo Sign In'}</Text>
             <Text style={s.subtitle}>
               {stage === 'email'
                 ? 'Enter your email address to sign in to your Hera account'
-                : `We sent a 4-digit code to\n${normalizedEmail}`}
+                : stage === 'otp'
+                ? `We sent a 4-digit code to\n${normalizedEmail}`
+                : `Enter the account password for\n${normalizedEmail}`}
             </Text>
           </View>
 
@@ -414,6 +439,25 @@ export default function LoginScreen() {
                   <Text style={[s.consentLink, { color: c.primaryLight }]} onPress={() => Linking.openURL('https://downloadhera.com/privacy')}>Privacy Policy</Text>
                   {'.'}
                 </Text>
+              </>
+            ) : stage === 'password' ? (
+              <>
+                <View style={s.fieldWrap}>
+                  <Text style={s.fieldLabel}>Password</Text>
+                  <View style={s.inputRow}>
+                    <Ionicons name="lock-closed-outline" size={18} color={c.textSubtle} style={s.inputIcon} />
+                    <TextInput value={password} onChangeText={setPassword} placeholder="Account password" placeholderTextColor={c.textSubtle} style={s.input} secureTextEntry autoCapitalize="none" autoCorrect={false} autoFocus returnKeyType="done" onSubmitEditing={handlePasswordLogin} />
+                  </View>
+                </View>
+                <Pressable onPress={handlePasswordLogin} disabled={operationLoading || !password} style={({ pressed }) => [s.btnWrap, (pressed || operationLoading || !password) && { opacity: 0.68 }]}>
+                  <LinearGradient colors={primaryGradient} style={s.btn}>
+                    {operationLoading ? <Text style={s.btnText}>Signing in…</Text> : <><Ionicons name="log-in-outline" size={17} color="white" /><Text style={s.btnText}>Sign In</Text></>}
+                  </LinearGradient>
+                </Pressable>
+                <Pressable onPress={() => { setStage('email'); setPassword(''); }} style={s.resendBtn}>
+                  <Ionicons name="arrow-back" size={13} color={c.primaryLight} />
+                  <Text style={s.resendText}>Use a different email</Text>
+                </Pressable>
               </>
             ) : (
               <>
