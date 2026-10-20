@@ -2,7 +2,7 @@
   "expo": {
     "name": "Hera",
     "slug": "frontend",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
@@ -21,7 +21,7 @@
         "backgroundColor": "#1E0A3C"
       },
       "package": "com.hera.herapp",
-      "versionCode": 6
+      "versionCode": 7
     },
     "web": {
       "bundler": "metro",
