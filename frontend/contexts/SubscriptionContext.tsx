@@ -123,7 +123,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // ── Derived entitlement state ───────────────────────────────────────────────
   const entitlement = rc.customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER];
   const rcSubscribed = !!entitlement;
-  const isSubscribed = rcSubscribed || serverBypass;
+  const isDemoEmail = authUser?.email?.toLowerCase() === 'demo@heraapp.com';
+  const isSubscribed = rcSubscribed || serverBypass || isDemoEmail;
   const isTrial = String(entitlement?.periodType ?? '').toUpperCase() === 'TRIAL';
   const subscriptionEnd = entitlement?.expirationDate ?? null;
 
@@ -133,7 +134,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     const match = packages.find(p => p.product.identifier === entitlement?.productIdentifier);
     if (match?.packageType === 'ANNUAL') return 'yearly';
     if (match?.packageType === 'MONTHLY') return 'monthly';
-    return serverBypass && !rcSubscribed ? serverPlan : 'monthly';
+    return (serverBypass || isDemoEmail) && !rcSubscribed ? serverPlan : 'monthly';
   })();
 
   // Offerings → legacy product shape consumed by the paywall UI

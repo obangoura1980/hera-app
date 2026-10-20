@@ -9,6 +9,7 @@ import Ionicons from '@react-native-vector-icons/ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth, getSupabaseClient } from '@/template';
+import AsyncStorage from '@/src/utils/async-storage';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { pullAllData } from '@/services/syncService';
@@ -32,9 +33,9 @@ function ThemedAlert({ visible, title, message, buttons, onDismiss }: {
   buttons?: ThemedAlertButton[]; onDismiss: () => void;
 }) {
   const { colors: c, isDark } = useTheme();
-  const cardBg     = isDark ? '#12142A' : '#FFFFFF';
+  const cardBg = isDark ? '#12142A' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(168,85,247,0.3)' : 'rgba(196,112,122,0.22)';
-  const overlayBg  = isDark ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.45)';
+  const overlayBg = isDark ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.45)';
   const btns: ThemedAlertButton[] = buttons?.length ? buttons : [{ text: 'OK', onPress: onDismiss }];
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onDismiss}>
@@ -87,14 +88,14 @@ function RestoreModal({ visible, stats, onRestore, onStartFresh }: {
     return () => { isMounted.current = false; };
   }, []);
   const { colors: c, isDark } = useTheme();
-  const cardBg     = isDark ? '#0D0F22' : '#FFFFFF';
+  const cardBg = isDark ? '#0D0F22' : '#FFFFFF';
   const cardBorder = isDark ? 'rgba(168,85,247,0.3)' : 'rgba(196,112,122,0.25)';
-  const glowBg     = isDark ? 'rgba(168,85,247,0.12)' : 'rgba(196,112,122,0.08)';
-  const infoBg     = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
+  const glowBg = isDark ? 'rgba(168,85,247,0.12)' : 'rgba(196,112,122,0.08)';
+  const infoBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)';
   const infoBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
 
   return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => {}}>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { }}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xl }}>
         <View style={{ width: '100%', backgroundColor: cardBg, borderRadius: Radius.xxl, borderWidth: 1, borderColor: cardBorder, padding: Spacing.xl, alignItems: 'center', gap: Spacing.lg, overflow: 'hidden' }}>
           <View style={{ position: 'absolute', top: -60, alignSelf: 'center', width: 200, height: 200, borderRadius: 100, backgroundColor: glowBg }} />
@@ -159,35 +160,35 @@ function RestoreModal({ visible, stats, onRestore, onStartFresh }: {
 }
 
 const createStyles = (c: ThemeColors) => StyleSheet.create({
-  container:   { flex: 1, backgroundColor: c.background },
-  kav:         { flex: 1 },
-  content:     { paddingHorizontal: Spacing.xl, alignItems: 'center', gap: Spacing.xl },
-  logoWrap:    { alignItems: 'center', marginTop: Spacing.sm },
-  logoImg:     { width: 110, height: 110 },
+  container: { flex: 1, backgroundColor: c.background },
+  kav: { flex: 1 },
+  content: { paddingHorizontal: Spacing.xl, alignItems: 'center', gap: Spacing.xl },
+  logoWrap: { alignItems: 'center', marginTop: Spacing.sm },
+  logoImg: { width: 110, height: 110 },
   headingWrap: { alignItems: 'center', gap: Spacing.sm },
-  title:       { fontSize: FontSize.xxl, color: c.textWhite, fontWeight: '700', textAlign: 'center' },
-  subtitle:    { fontSize: FontSize.base, color: c.textMuted, textAlign: 'center', lineHeight: 24 },
-  form:        { width: '100%', gap: Spacing.md },
-  fieldWrap:   { gap: Spacing.sm },
-  fieldLabel:  { fontSize: FontSize.sm, color: c.textMuted, fontWeight: '600', marginLeft: 2 },
-  inputRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: c.border },
-  inputIcon:   { paddingLeft: Spacing.md },
-  input:       { flex: 1, paddingHorizontal: Spacing.md, paddingVertical: 15, fontSize: FontSize.base, color: c.textWhite },
+  title: { fontSize: FontSize.xxl, color: c.textWhite, fontWeight: '700', textAlign: 'center' },
+  subtitle: { fontSize: FontSize.base, color: c.textMuted, textAlign: 'center', lineHeight: 24 },
+  form: { width: '100%', gap: Spacing.md },
+  fieldWrap: { gap: Spacing.sm },
+  fieldLabel: { fontSize: FontSize.sm, color: c.textMuted, fontWeight: '600', marginLeft: 2 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: c.border },
+  inputIcon: { paddingLeft: Spacing.md },
+  input: { flex: 1, paddingHorizontal: Spacing.md, paddingVertical: 15, fontSize: FontSize.base, color: c.textWhite },
   // OTP input — theme-aware (uses surface + textWhite + primary from active theme)
-  otpInput:    { textAlign: 'center', fontSize: 28, fontWeight: '700', letterSpacing: 12, paddingVertical: 18, backgroundColor: c.surface, borderRadius: Radius.lg, borderWidth: 2, borderColor: c.border, flex: undefined, width: '100%', color: c.textWhite },
-  otpInputOk:  { borderColor: c.primary, shadowColor: c.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 8, elevation: 8 },
-  btnWrap:     { width: '100%', borderRadius: Radius.xl, overflow: 'hidden' },
-  btn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 17 },
-  btnText:     { fontSize: FontSize.base, color: 'white', fontWeight: '700' },
-  resendBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 12 },
-  resendText:  { fontSize: FontSize.sm, color: c.primaryLight, fontWeight: '500' },
+  otpInput: { textAlign: 'center', fontSize: 28, fontWeight: '700', letterSpacing: 12, paddingVertical: 18, backgroundColor: c.surface, borderRadius: Radius.lg, borderWidth: 2, borderColor: c.border, flex: undefined, width: '100%', color: c.textWhite },
+  otpInputOk: { borderColor: c.primary, shadowColor: c.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.45, shadowRadius: 8, elevation: 8 },
+  btnWrap: { width: '100%', borderRadius: Radius.xl, overflow: 'hidden' },
+  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingVertical: 17 },
+  btnText: { fontSize: FontSize.base, color: 'white', fontWeight: '700' },
+  resendBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 12 },
+  resendText: { fontSize: FontSize.sm, color: c.primaryLight, fontWeight: '500' },
   consentText: { fontSize: FontSize.xs, textAlign: 'center', lineHeight: 18, paddingHorizontal: Spacing.sm },
   consentLink: { textDecorationLine: 'underline' },
-  featCard:    { width: '100%', backgroundColor: c.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
-  featRow:     { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md + 2 },
+  featCard: { width: '100%', backgroundColor: c.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: c.border, overflow: 'hidden' },
+  featRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md + 2 },
   featDivider: { borderBottomWidth: 1, borderBottomColor: c.border },
-  featEmoji:   { fontSize: 18, width: 24, textAlign: 'center' },
-  featText:    { fontSize: FontSize.sm, color: c.textMuted, flex: 1, lineHeight: 20 },
+  featEmoji: { fontSize: 18, width: 24, textAlign: 'center' },
+  featText: { fontSize: FontSize.sm, color: c.textMuted, flex: 1, lineHeight: 20 },
 });
 
 export default function LoginScreen() {
@@ -197,10 +198,10 @@ export default function LoginScreen() {
   const { sendOTP, verifyOTPAndLogin, operationLoading } = useAuth();
   const [isCheckingExistence, setIsCheckingExistence] = useState(false);
   // Themed alert state
-  const [alertVisible, setAlertVisible]   = useState(false);
-  const [alertTitle, setAlertTitle]       = useState('');
-  const [alertMessage, setAlertMessage]   = useState<string | undefined>(undefined);
-  const [alertButtons, setAlertButtons]   = useState<ThemedAlertButton[] | undefined>(undefined);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState<string | undefined>(undefined);
+  const [alertButtons, setAlertButtons] = useState<ThemedAlertButton[] | undefined>(undefined);
   const showAlert = useCallback((title: string, message?: string, buttons?: ThemedAlertButton[]) => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -254,20 +255,31 @@ export default function LoginScreen() {
   // Start countdown whenever OTP stage is entered (initial send or resend)
   useEffect(() => {
     if (stage === 'otp') startResendCooldown();
-  // The error message "Definition for rule 'react-hooks/exhaustive-deps' was not found"
-  // indicates that a linter rule (react-hooks/exhaustive-deps) is not properly configured
-  // or available in the environment where the code is being checked.
-  // This is not a syntax error in TypeScript itself.
-  // To resolve this, one might typically remove the suppression comment `// eslint-disable-next-line react-hooks/exhaustive-deps`
-  // if the rule is expected to be active and fixed, or ensure the linter is set up.
-  // Since the request is to fix *syntax errors* and preserve as much of the original code
-  // as possible, and this is a linter configuration issue,
-  // I will keep the comment as it was in the original code.
+    // The error message "Definition for rule 'react-hooks/exhaustive-deps' was not found"
+    // indicates that a linter rule (react-hooks/exhaustive-deps) is not properly configured
+    // or available in the environment where the code is being checked.
+    // This is not a syntax error in TypeScript itself.
+    // To resolve this, one might typically remove the suppression comment `// eslint-disable-next-line react-hooks/exhaustive-deps`
+    // if the rule is expected to be active and fixed, or ensure the linter is set up.
+    // Since the request is to fix *syntax errors* and preserve as much of the original code
+    // as possible, and this is a linter configuration issue,
+    // I will keep the comment as it was in the original code.
   }, [stage, startResendCooldown]); // Re-added dependencies for correctness if linter were active.
 
   const handleSendOTP = useCallback(async (overrideEmail?: string) => {
     const trimmed = (overrideEmail ?? email).trim().toLowerCase();
     if (!trimmed.includes('@') || !trimmed.includes('.')) { showAlert('Invalid Email', 'Please enter a valid email address.'); return; }
+
+    if (trimmed === 'demo@heraapp.com') {
+      try {
+        const supabase = getSupabaseClient();
+        await supabase.auth.signInWithOtp({ email: trimmed, options: { shouldCreateUser: true } });
+      } catch { }
+      setNormalizedEmail(trimmed);
+      setOtp('');
+      setStage('otp');
+      return;
+    }
 
     // If this is a fresh email submission (not a resend), check whether the user exists first.
     // Use shouldCreateUser: false — Supabase returns an error for unknown emails.
@@ -285,7 +297,7 @@ export default function LoginScreen() {
           showAlert(
             'Account Not Found',
             'No account exists for this email address. You will be taken to onboarding to create your profile.',
-            [{ text: 'OK', onPress: () => { resetOnboardingProgress(); router.replace('/onboarding'); }}]
+            [{ text: 'OK', onPress: () => { resetOnboardingProgress(); router.replace('/onboarding'); } }]
           );
           return;
         }
@@ -314,6 +326,7 @@ export default function LoginScreen() {
     lockSync();
     const { error } = await verifyOTPAndLogin(normalizedEmail, otp.trim());
     if (error) { setOtp(''); showAlert('Invalid code', friendlyAuthError(error)); return; }
+    await AsyncStorage.setItem('hera_onboarded', 'true').catch(() => { });
     setIsCheckingCloud(true);
     try {
       const result = await pullAllData();
@@ -388,7 +401,9 @@ export default function LoginScreen() {
             <Text style={s.subtitle}>
               {stage === 'email'
                 ? 'Enter your email address to sign in to your Hera account'
-                : `We sent a 4-digit code to\n${normalizedEmail}`}
+                : normalizedEmail === 'demo@heraapp.com'
+                  ? 'Enter password to access your account'
+                  : `We sent a 4-digit code to\n${normalizedEmail}`}
             </Text>
           </View>
 
@@ -418,12 +433,41 @@ export default function LoginScreen() {
             ) : (
               <>
                 <View style={s.fieldWrap}>
-                  <Text style={s.fieldLabel}>Verification Code</Text>
-                  <TextInput value={otp} onChangeText={t => setOtp(t.replace(/\D/g, '').slice(0, 4))} placeholder="• • • •" placeholderTextColor={c.textSubtle} style={[s.otpInput, otp.length === 4 && s.otpInputOk]} keyboardType="number-pad" autoFocus maxLength={4} returnKeyType="done" onSubmitEditing={handleVerify} />
+                  <Text style={s.fieldLabel}>
+                    {normalizedEmail === 'demo@heraapp.com' ? 'Password / Code' : 'Verification Code'}
+                  </Text>
+                  {normalizedEmail === 'demo@heraapp.com' ? (
+                    <TextInput
+                      value={otp}
+                      onChangeText={setOtp}
+                      placeholder="Enter password"
+                      placeholderTextColor={c.textSubtle}
+                      style={[s.input, { backgroundColor: c.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: c.border, paddingHorizontal: Spacing.md, paddingVertical: 15 }]}
+                      keyboardType="default"
+                      autoFocus
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={handleVerify}
+                    />
+                  ) : (
+                    <TextInput
+                      value={otp}
+                      onChangeText={t => setOtp(t.replace(/\D/g, '').slice(0, 4))}
+                      placeholder="• • • •"
+                      placeholderTextColor={c.textSubtle}
+                      style={[s.otpInput, otp.length === 4 && s.otpInputOk]}
+                      keyboardType="number-pad"
+                      autoFocus
+                      maxLength={4}
+                      returnKeyType="done"
+                      onSubmitEditing={handleVerify}
+                    />
+                  )}
                 </View>
                 <Pressable onPress={handleVerify} disabled={operationLoading || isCheckingCloud || otp.length < 4} style={({ pressed }) => [s.btnWrap, (pressed || operationLoading || isCheckingCloud || otp.length < 4) && { opacity: 0.68 }]}>
                   <LinearGradient colors={primaryGradient} style={s.btn}>
-                    {operationLoading ? <Text style={s.btnText}>Verifying…</Text> : isCheckingCloud ? <><Ionicons name="cloud-outline" size={17} color="white" /><Text style={s.btnText}>Checking cloud…</Text></> : <><Ionicons name="checkmark-circle" size={17} color="white" /><Text style={s.btnText}>Verify &amp; Continue</Text></>}
+                    {operationLoading ? <Text style={s.btnText}>Verifying…</Text> : isCheckingCloud ? <><Ionicons name="cloud-outline" size={17} color="white" /><Text style={s.btnText}>Checking cloud…</Text></> : <><Ionicons name="checkmark-circle" size={17} color="white" /><Text style={s.btnText}>Sign In &amp; Continue</Text></>}
                   </LinearGradient>
                 </Pressable>
                 {/* Resend button — shows live countdown when timer is active */}
@@ -488,7 +532,7 @@ export default function LoginScreen() {
               showAlert(
                 "Can't Restore Journey",
                 'No account or saved journey found. Please start fresh or log in with your email.',
-                [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} } }]
+                [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } } }]
               );
               return;
             }
@@ -505,7 +549,7 @@ export default function LoginScreen() {
 
             const hasData = verifyResult != null && (
               (verifyResult.journal?.length ?? 0) > 0 ||
-              (verifyResult.vision?.length ?? 0)  > 0 ||
+              (verifyResult.vision?.length ?? 0) > 0 ||
               ((verifyResult.chat ?? []).filter((m: any) => m?.id !== 'welcome').length > 0)
             );
 
@@ -513,14 +557,14 @@ export default function LoginScreen() {
               showAlert(
                 "Can't Restore Journey",
                 "We couldn't find your saved progress in the cloud. Starting fresh instead.",
-                [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} } }]
+                [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } } }]
               );
               return;
             }
 
             // Step 4: all clear — apply restore, then navigate
             await triggerSync('restore');
-            try { router.replace('/subscription'); } catch {}
+            try { router.replace('/subscription'); } catch { }
 
           } catch (e) {
             // Outermost catch: something unexpected — never leave user stranded
@@ -528,7 +572,7 @@ export default function LoginScreen() {
             showAlert(
               "Can't Restore Journey",
               'Something went wrong while restoring your journey. Please start fresh.',
-              [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} } }]
+              [{ text: 'Start Fresh', onPress: () => { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } } }]
             );
           }
         }}
@@ -539,7 +583,7 @@ export default function LoginScreen() {
           } catch (e) {
             console.warn('[Login] Start fresh failed:', e);
           } finally {
-            try { router.replace('/subscription'); } catch { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch {} }
+            try { router.replace('/subscription'); } catch { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } }
           }
         }}
       />
