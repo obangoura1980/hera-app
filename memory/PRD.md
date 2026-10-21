@@ -111,3 +111,8 @@
 - iOS bundleIdentifier changed to com.hera.herapp (matches user's live App Store app; same as Android package)
 - expo.version 6.0.0 (live App Store version was 5.0.0); iOS buildNumber/Android versionCode managed remotely by EAS
 - User must confirm RevenueCat iOS app (app8070880860) bundle ID = com.hera.herapp
+
+## Update (2026-10-21) — pre-iOS-build hardening
+- Removed mocked POST /api/premium/activate (unused by app; let any signed-in user grant themselves premium). Now 404. Premium only via RevenueCat or PREMIUM_BYPASS_EMAILS
+- Deployment check: iOS config OK (bundle com.hera.herapp, v6.0.0, permission strings present, plugins resolve, compiles)
+- Deliberately NOT changed: .gitignore .env patterns (flagged by deploy agent, but earlier builds received frontend/.env fine and the repo is public — un-ignoring would publish keys)

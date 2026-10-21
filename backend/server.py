@@ -341,14 +341,6 @@ async def delete_account(user: User = Depends(current_user)):
     return {"ok": True}
 
 
-@api.post("/premium/activate")
-async def premium_activate(user: User = Depends(current_user)):
-    # MOCK: no real payment processing yet
-    await db.users.update_one({"_id": ObjectId(user.id)}, {"$set": {"is_premium": True}})
-    user.is_premium = True
-    return user.public()
-
-
 # ---------------------------------------------------------------- routes: stats / affirmations
 @api.get("/stats")
 async def stats(user: User = Depends(current_user)):
