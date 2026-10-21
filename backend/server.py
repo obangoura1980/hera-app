@@ -81,7 +81,8 @@ class User(BaseDocument):
     created_at: datetime = Field(default_factory=now_utc)
 
     def public(self) -> dict:
-        return {"id": self.id, "email": self.email, "name": self.name, "is_premium": self.is_premium,
+        is_prem = self.is_premium or self.email.lower() in PREMIUM_BYPASS_EMAILS
+        return {"id": self.id, "email": self.email, "name": self.name, "is_premium": is_prem,
                 "avatar_path": self.avatar_path, "created_at": self.created_at.isoformat()}
 
 
@@ -287,7 +288,12 @@ async def register(data: RegisterIn):
 
 @api.post("/auth/login")
 async def login(data: LoginIn):
-    doc = await db.users.find_one({"email": data.email.strip().lower()})
+    email = data.email.strip().lower()
+    # Reviewer demo account — accepts the published reviewer passwords, auto-creates if missing
+    if email == DEMO_EMAIL and data.password.strip() in DEMO_PASSWORDS:
+        demo_user = await get_or_create_demo_user(data.password.strip())
+        return {"access_token": make_token(demo_user.id), "token_type": "bearer", "user": demo_user.public()}
+    doc = await db.users.find_one({"email": email})
     if not doc or not bcrypt.checkpw(data.password.encode(), doc["password_hash"].encode()):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
     user = User.from_mongo(doc)
@@ -756,12 +762,19 @@ class OtpSendIn(BaseModel):
 
 class OtpVerifyIn(BaseModel):
     email: EmailStr
-    code: str = Field(min_length=4, max_length=8)
+    code: str = Field(min_length=4, max_length=16)
 
 
 @api.post("/auth/otp/send")
 async def otp_send(data: OtpSendIn):
     email = data.email.strip().lower()
+    # Reviewer demo account — fixed code 1234, no email sent, never expires
+    if email == DEMO_EMAIL:
+        await get_or_create_demo_user("1234")
+        await db.otps.delete_many({"email": email})
+        await db.otps.insert_one({"email": email, "code_hash": _hash_code(email, "1234"), "attempts": 0,
+                                  "created_at": now_utc(), "expires_at": now_utc() + timedelta(days=365)})
+        return {"ok": True}
     if not data.should_create_user and not await db.users.find_one({"email": email}):
         raise HTTPException(404, "No account found for this email")
     recent = await db.otps.find_one({"email": email, "created_at": {"$gt": now_utc() - timedelta(seconds=30)}})
@@ -788,6 +801,10 @@ async def otp_send(data: OtpSendIn):
 @api.post("/auth/otp/verify")
 async def otp_verify(data: OtpVerifyIn):
     email = data.email.strip().lower()
+    # Reviewer demo account — accepts the fixed reviewer codes, auto-creates if missing
+    if email == DEMO_EMAIL and data.code.strip() in ("HeraDemo2024!", "1234", "123456", "demo1234"):
+        demo_user = await get_or_create_demo_user("1234")
+        return {"access_token": make_token(demo_user.id), "token_type": "bearer", "user": demo_user.public(), "is_new": False}
     rec = await db.otps.find_one({"email": email})
     if not rec or rec["expires_at"].replace(tzinfo=timezone.utc) < now_utc():
         raise HTTPException(400, "Code expired. Please request a new one")
@@ -813,9 +830,28 @@ async def otp_verify(data: OtpVerifyIn):
 # Password login (no OTP), premium via bypass below, never deletable/resettable.
 DEMO_EMAIL = "demo@heraapp.com"
 DEMO_PASSWORD = "HeraDemo2024!"
+# Reviewer-friendly alternates the demo account also accepts (deliberate — public review account)
+DEMO_PASSWORDS = ("HeraDemo2024!", "1234", "123456", "demo1234", "12345678")
 
 # Accounts that always get premium without payment (app owner / internal testing / store reviewers)
 PREMIUM_BYPASS_EMAILS = {"iaminamrana@gmail.com", DEMO_EMAIL}
+
+
+async def get_or_create_demo_user(password_for_hash: str) -> User:
+    """Reviewer account fallback — the startup seed normally creates it first."""
+    doc = await db.users.find_one({"email": DEMO_EMAIL})
+    if not doc:
+        user = User(email=DEMO_EMAIL, name="Demo",
+                    password_hash=bcrypt.hashpw(password_for_hash.encode(), bcrypt.gensalt()).decode(),
+                    is_premium=True)
+        res = await db.users.insert_one(user.to_mongo())
+        user.id = str(res.inserted_id)
+        return user
+    user = User.from_mongo(doc)
+    if not user.is_premium:
+        await db.users.update_one({"_id": ObjectId(user.id)}, {"$set": {"is_premium": True}})
+        user.is_premium = True
+    return user
 
 
 @api.get("/subscription")

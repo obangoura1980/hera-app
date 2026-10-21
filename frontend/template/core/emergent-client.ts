@@ -61,6 +61,8 @@ const client = {
       return { data: { subscription: { unsubscribe: () => listeners.delete(cb) } } };
     },
     signInWithOtp: async ({ email, options }: { email: string; options?: { shouldCreateUser?: boolean } }) => {
+      // Reviewer demo account — backend issues a fixed code; skip the send call
+      if (email.toLowerCase() === "demo@heraapp.com") return ok({});
       try {
         await api("/auth/otp/send", { method: "POST", body: { email, should_create_user: options?.shouldCreateUser ?? true } });
         return ok({});

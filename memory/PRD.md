@@ -98,3 +98,11 @@
 - Login screen (app/login.tsx): entering the demo email switches to a "Demo Sign In" password stage (invisible to regular users, OTP flow unchanged); routes into the app with premium active
 - Testing agent iteration 29: 6/6 flows pass (demo detection, login, wrong password, back-to-email, OTP regression, premium access)
 - NOTE: production Atlas DB gets the seed only after the NEXT backend deploy — reviewer credentials go live on redeploy
+
+## Update (2026-10-21) — GitHub repo merge (repo = source of truth, careful merge)
+- Pulled public repo github.com/obangoura1980/hera-app and merged user's changes on top of our work
+- Backend: demo login accepts reviewer passwords (HeraDemo2024!/1234/123456/demo1234/12345678); demo OTP send returns fixed code 1234 (no email, 365-day expiry); demo OTP verify accepts 1234/password; User.public() reflects premium for bypass emails; OtpVerifyIn max_length 8→16. KEPT ours: startup seed, delete/reset 403 protection, /health. Single get_or_create_demo_user helper instead of repo's 3 duplicated blocks
+- Frontend: subscription stack replaced with RevenueCat native paywall — new RevenueCatPaywall.native.tsx (RevenueCatUI.Paywall, offeringId support, purchase/restore callbacks) + web fallback RevenueCatPaywall.tsx (no purchases-ui on web: premium notice + Restore); PaywallModal now thin Modal wrapper; SubscriptionContext showPaywall(feature, offeringId) presents native paywall when PaywallView exists, demo email = subscribed client-side; login.tsx repo demo flow (demo email → OTP stage with Password/Code field, marks hera_onboarded); app.json version 1.0.6 + versionCode 10
+- SKIPPED from repo deliberately: emergent-client.ts fake demo token fallback (would fabricate invalid session; backend handles demo verify for real) — adopted only its OTP-send demo short-circuit; repo frontend/android dir (managed workflow); revenuecat.tsx repo version (older — kept our retry/refetch hardening)
+- Verified: lint clean (frontend+backend), demo login via code 1234 lands on Home with premium, /subscription web fallback renders, 10/10 backend curl checks pass
+- NOTE: native RC paywall UI needs a device build to validate; if no paywall is designed in RC Paywall Editor, the SDK shows its default paywall

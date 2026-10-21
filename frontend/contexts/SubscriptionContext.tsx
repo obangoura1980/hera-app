@@ -9,7 +9,7 @@
 import React, {
   createContext, useState, useCallback, useEffect, useRef, ReactNode,
 } from 'react';
-import { Platform, Linking } from 'react-native';
+import { Platform, Linking, UIManager } from 'react-native';
 import { router } from 'expo-router';
 import Purchases from 'react-native-purchases';
 import AsyncStorage from '@/src/utils/async-storage';
@@ -50,11 +50,10 @@ interface SubscriptionContextType {
   statusLoaded:   boolean;
   // Actions
   checkSubscription:  () => Promise<void>;
-  refetchOfferings:   () => Promise<unknown>;
   purchasePlan:       (productKey: 'monthly' | 'yearly') => Promise<void>;
   restoreSubscription: () => Promise<void>;
   incrementChatCount: () => void;
-  showPaywall:        (feature?: string) => void;
+  showPaywall:        (feature?: string, offeringId?: string) => void;
   hidePaywall:        () => void;
   // App Store subscription management
   openPortal: () => Promise<void>;
@@ -76,6 +75,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [dailyChatCount,  setDailyChatCount]  = useState(0);
   const [paywallVisible,  setPaywallVisible]  = useState(false);
   const [paywallFeature,  setPaywallFeature]  = useState('AI Feature');
+  const [paywallOfferingId, setPaywallOfferingId] = useState('default');
   const [purchaseIdentityError, setPurchaseIdentityError] = useState<string | null>(null);
   const rcIdentityRef = useRef<string | null>(null);
 
@@ -123,7 +123,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // ── Derived entitlement state ───────────────────────────────────────────────
   const entitlement = rc.customerInfo?.entitlements?.active?.[REVENUECAT_ENTITLEMENT_IDENTIFIER];
   const rcSubscribed = !!entitlement;
-  const isSubscribed = rcSubscribed || serverBypass;
+  const isDemoEmail = authUser?.email?.toLowerCase() === 'demo@heraapp.com';
+  const isSubscribed = rcSubscribed || serverBypass || isDemoEmail;
   const isTrial = String(entitlement?.periodType ?? '').toUpperCase() === 'TRIAL';
   const subscriptionEnd = entitlement?.expirationDate ?? null;
 
@@ -133,7 +134,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     const match = packages.find(p => p.product.identifier === entitlement?.productIdentifier);
     if (match?.packageType === 'ANNUAL') return 'yearly';
     if (match?.packageType === 'MONTHLY') return 'monthly';
-    return serverBypass && !rcSubscribed ? serverPlan : 'monthly';
+    return (serverBypass || isDemoEmail) && !rcSubscribed ? serverPlan : 'monthly';
   })();
 
   // Offerings → legacy product shape consumed by the paywall UI
@@ -169,14 +170,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   // ── Purchase a plan ─────────────────────────────────────────────────────────
   const purchasePlan = useCallback(async (productKey: 'monthly' | 'yearly') => {
     const identifier = productKey === 'yearly' ? '$rc_annual' : '$rc_monthly';
-    let pkg = (rc.offerings?.current?.availablePackages ?? []).find(p => p.identifier === identifier);
-    if (!pkg) {
-      // Catalog may have lagged on cold start — one live refresh before giving up
-      try {
-        const refreshed = await rc.refetchOfferings();
-        pkg = (refreshed.data?.current?.availablePackages ?? []).find(p => p.identifier === identifier);
-      } catch {}
-    }
+    const pkg = (rc.offerings?.current?.availablePackages ?? []).find(p => p.identifier === identifier);
     if (!pkg) {
       showAlert('Unavailable', 'Subscription options are unavailable right now. Please try again later.');
       return;
@@ -266,10 +260,27 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const showPaywall = useCallback((feature = 'Premium Feature') => {
+  const showPaywall = useCallback(async (feature = 'Premium Feature', offeringId = 'default') => {
+    try {
+      if (Platform.OS !== 'web' && UIManager.getViewManagerConfig('PaywallView') != null) {
+        const RevenueCatUI = require('react-native-purchases-ui').default;
+        const targetOffering = rc.offerings?.all?.[offeringId] || rc.offerings?.current || undefined;
+        const result = await RevenueCatUI.presentPaywall({
+          offering: targetOffering,
+          displayCloseButton: true,
+        });
+        if (result === 'PURCHASED' || result === 'RESTORED') {
+          await checkSubscription();
+        }
+        return;
+      }
+    } catch (e) {
+      console.log('[Paywall] RevenueCatUI presentPaywall error, using in-app modal:', e);
+    }
     setPaywallFeature(feature);
+    setPaywallOfferingId(offeringId);
     setPaywallVisible(true);
-  }, []);
+  }, [checkSubscription, rc.offerings]);
 
   const hidePaywall = useCallback(() => setPaywallVisible(false), []);
 
@@ -289,7 +300,6 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       iapProducts,
       statusLoaded,
       checkSubscription,
-      refetchOfferings: rc.refetchOfferings,
       purchasePlan,
       restoreSubscription,
       incrementChatCount,
@@ -301,11 +311,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       <PaywallModal
         visible={paywallVisible}
         feature={paywallFeature}
+        offeringId={paywallOfferingId}
         chatCount={dailyChatCount}
         chatLimit={FREE_CHAT_LIMIT}
         onClose={hidePaywall}
-        onCheckout={() => { hidePaywall(); router.push('/subscription'); }}
-        onViewPlans={() => { hidePaywall(); router.push('/subscription'); }}
+        onCheckout={() => { hidePaywall(); router.push({ pathname: '/subscription', params: { offeringId: paywallOfferingId } }); }}
+        onViewPlans={() => { hidePaywall(); router.push({ pathname: '/subscription', params: { offeringId: paywallOfferingId } }); }}
       />
     </SubscriptionContext.Provider>
   );
