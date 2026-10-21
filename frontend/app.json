@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.hera.herapp",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board",
-        "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera"
+        "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -49,8 +50,8 @@
         "expo-image-picker",
         {
           "photosPermission": "Choose photos for your profile and vision board",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "cameraPermission": "Take photos for your profile and vision board",
+          "microphonePermission": "Record audio when capturing videos for your vision board"
         }
       ],
       "expo-audio",

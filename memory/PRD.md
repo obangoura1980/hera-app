@@ -116,3 +116,8 @@
 - Removed mocked POST /api/premium/activate (unused by app; let any signed-in user grant themselves premium). Now 404. Premium only via RevenueCat or PREMIUM_BYPASS_EMAILS
 - Deployment check: iOS config OK (bundle com.hera.herapp, v6.0.0, permission strings present, plugins resolve, compiles)
 - Deliberately NOT changed: .gitignore .env patterns (flagged by deploy agent, but earlier builds received frontend/.env fine and the repo is public — un-ignoring would publish keys)
+
+## Update (2026-10-21) — iOS build missing from App Store Connect
+- Likely cause: expo-image-picker plugin had cameraPermission:false + microphonePermission:false -> NSCameraUsageDescription/NSMicrophoneUsageDescription absent while the linked picker binary references camera APIs -> Apple post-upload processing rejects (ITMS-90683), build never appears in ASC (Apple emails the account holder)
+- Fix: real camera/mic purpose strings + ios.infoPlist ITSAppUsesNonExemptEncryption=false. Verified via expo config introspect: all Usage strings present, bundle com.hera.herapp, version 6.0.0
+- Other possible causes if it recurs: build uploaded under a different Apple team/app record; still processing (up to ~1h); build number already used
