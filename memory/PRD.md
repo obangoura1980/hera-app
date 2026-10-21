@@ -106,3 +106,8 @@
 - SKIPPED from repo deliberately: emergent-client.ts fake demo token fallback (would fabricate invalid session; backend handles demo verify for real) — adopted only its OTP-send demo short-circuit; repo frontend/android dir (managed workflow); revenuecat.tsx repo version (older — kept our retry/refetch hardening)
 - Verified: lint clean (frontend+backend), demo login via code 1234 lands on Home with premium, /subscription web fallback renders, 10/10 backend curl checks pass
 - NOTE: native RC paywall UI needs a device build to validate; if no paywall is designed in RC Paywall Editor, the SDK shows its default paywall
+
+## Update (2026-10-21) — App Store identity
+- iOS bundleIdentifier changed to com.hera.herapp (matches user's live App Store app; same as Android package)
+- expo.version 6.0.0 (live App Store version was 5.0.0); iOS buildNumber/Android versionCode managed remotely by EAS
+- User must confirm RevenueCat iOS app (app8070880860) bundle ID = com.hera.herapp

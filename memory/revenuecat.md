@@ -14,7 +14,7 @@ This file serves as memory for interacting with the user's RevenueCat account vi
 - NOTE: /setup response is CACHED/STALE (returns old app ids + old keys). The live SDK keys are the NEW ones in frontend/.env. Old-key builds will fail to fetch offerings.
 - NOTE (2026-10-13): /products upsert returned success with trial P1W + new prices — verify on a production build whether the new-app products actually carry trial/pricing (Test Store products with transactions were previously immutable).
 - Dashboard: https://app.revenuecat.com/projects/proj5cf7090a
-- bundle_id: com.emergent.manifestdreams.qc3zvj (iOS, app.json)
+- bundle_id: com.hera.herapp (iOS, app.json — changed 2026-10-21 to match the live App Store app; was com.emergent.manifestdreams.qc3zvj). Version 6.0.0 (previous live App Store version 5.0.0)
 - package_name: com.hera.herapp (Android, app.json — changed 2026-10-06 for AppsFlyer; /setup re-run with it)
 
 ## Status check

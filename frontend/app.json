@@ -2,14 +2,14 @@
   "expo": {
     "name": "Hera",
     "slug": "frontend",
-    "version": "1.0.6",
+    "version": "6.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.manifestdreams.qc3zvj",
+      "bundleIdentifier": "com.hera.herapp",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board",
         "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera"
