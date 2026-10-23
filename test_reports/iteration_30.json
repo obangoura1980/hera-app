@@ -1,0 +1,40 @@
+{
+  "summary": "FRONTEND-ONLY test (web preview, 390x844, public URL) of the paywall-fallback + onboarding-loop fix. ALL 6 REQUESTED FLOWS PASS. (1) Fresh user (localStorage cleared) completed the full onboarding (splash -> welcome -> referral -> 20 questions -> 'Generate My Profile' -> generating screen) and landed ONCE on /subscription?from=onboarding showing the AuthGate ('Create Account or Sign In'); URL polled for 12s = single stable URL, no bounce to /(tabs). (2) localStorage 'hera_onboarded' = '\"true\"' (AsyncStorage adapter JSON-encodes values — this is correct); reload of '/' -> /subscription and stayed stable 10s (not back to splash). (3) New non-premium user delivered+loop568@resend.dev via OTP (code_hash override) -> local TrialSummaryStep rendered ('Try Hera Free for 7 Days.', Annual/Monthly toggle works: 'Then $9.99 per month' after Monthly tap). NO 'Paywall is not available' text anywhere. Graceful empty state shown: 'Subscription options are unavailable right now.' + 'Tap to retry'. Tapping retry (with RevenueCat requests delayed 2s via route) showed spinner + 'Checking…', fired exactly 1 new GET api.revenuecat.com/v1/subscribers/<id>/offerings, then returned to 'Tap to retry' on /subscription; rapid double-tap also safe. (4) No loop: 12s watch on /subscription = 0 navigation events; goto '/' -> /subscription once (plan screen, not auth gate since logged in) and stable; direct /journal -> SubscriptionGuard replaced to /subscription once and stopped. (5) Demo regression: /login demo@heraapp.com -> password stage -> HeraDemo2024! -> Home ('Beautiful Soul, what do you want to manifest?' + tab bar), stable 10s, no paywall DOM ever seen; reload '/' -> Home, no paywall flash. Also demo via the subscription AuthGate right after onboarding (OTP 1234) -> Home with onboarding name 'Tester', stable. (6) Console: zero errors, no 'Maximum update depth exceeded'. Only pre-existing web warnings (require cycle, shadow*/textShadow*/pointerEvents deprecations, useNativeDriver fallback). Native RevenueCatUI paywall path (HAS_NATIVE_PAYWALL) cannot be tested on web — code-reviewed only.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "subscription.tsx TrialSummaryStep (empty-offerings state)", "issues": ["On native, a non-subscribed user whose offerings are empty has no forward path (only retry / Restore Purchases / Terms) — expected per brief, but consider a friendlier hint (e.g. 'Check your connection or try again later') or a support link so App Review doesn't see a dead end.", "At 390x844 the sticky CTA gradient overlays the 'No charge today · Cancel anytime' badge until scrolled — cosmetic."]}
+    ],
+    "react_native_issues": [
+      {"component": "testID coverage", "issue": "subscription.tsx has 0 testID props (email input, Continue with Email, OTP input, Verify & Continue, billing toggles, Tap to retry, CTA, Restore). Automation relies on text/placeholder. Reference: /app/frontend/app/subscription.tsx:109,229,251,630,644,659,671"},
+      {"component": "Require cycle", "issue": "Console warning: hooks/useSubscription.ts -> contexts/SubscriptionContext.tsx -> components/feature/PaywallModal.tsx -> components/feature/RevenueCatPaywall -> ... -> useSubscription. Non-blocking but can yield undefined imports at init. Reference: /app/frontend/contexts/SubscriptionContext.tsx:20"},
+      {"component": "Web deprecation warnings", "issue": "Pre-existing: 'shadow*'/'textShadow*' style props deprecated (use boxShadow/textShadow), props.pointerEvents deprecated (use style.pointerEvents) e.g. /app/frontend/app/subscription.tsx:225,468. Web-only, non-blocking."}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/otp_override_watcher.py", "/app/.screenshots/it30_after_onb.png", "/app/.screenshots/it30_plan.png", "/app/.screenshots/it30_checking.png", "/app/.screenshots/it30_demo_home.png"],
+  "action_items": [
+    "LOW: Add testID props to subscription.tsx interactive elements (auth gate inputs/buttons, billing toggles, retry Pressable, CTA, Restore).",
+    "LOW: Split /app/frontend/app/subscription.tsx (771 lines > 700) into AuthGateStep / TrialSummaryStep / CheckoutBreakdownStep component files; the price-derivation block (stripSuffix/monthlyPriceStr/yearlyPriceStr) is duplicated in TrialSummaryStep and CheckoutBreakdownStep — extract a hook.",
+    "LOW: Break the require cycle useSubscription -> SubscriptionContext -> PaywallModal -> RevenueCatPaywall.",
+    "LOW: index.tsx blocks on statusLoaded with no timeout — if GET /api/subscription or RevenueCat hangs, an onboarded user sees an indefinite blank #080A18 screen. Consider a timeout fallback (e.g. 8s -> /subscription)."
+  ],
+  "critical_code_review_comments": [
+    "subscription.tsx:733 useNativePaywall correctly gated on HAS_NATIVE_PAYWALL && !nativeFailed && packages>0; onDismiss/onLoadError set nativeFailed -> local paywall, so the old Close->/(tabs)->guard->/subscription loop is removed.",
+    "SubscriptionContext.tsx:278 showPaywall now throws to the local PaywallModal when the offering is empty — good.",
+    "subscription.tsx:546 `from` param in AuthGateStep is read but unused; CheckoutBreakdownStep destructures unused `statusLoaded` (lint noise).",
+    "(tabs)/_layout.tsx SubscriptionGuard waits for authLoading/isLoading/statusLoaded before replacing — verified it fires once (direct /journal -> /subscription, no repeat).",
+    "No deprecated Expo packages found (expo-audio used; no expo-av/expo-barcode-scanner/expo-background-fetch in package.json)."
+  ],
+  "updated_files": ["/app/backend/tests/otp_override_watcher.py (new test helper only; no app code modified)"],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "100% (6/6 requested flows + extra demo-via-AuthGate check)"},
+  "seed_data_creation": "Created user delivered+loop568@resend.dev during test; deleted afterwards (users + otps).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Web AsyncStorage adapter (src/utils/async-storage.ts -> storage util) JSON-encodes values: to pre-seed onboarding set localStorage.setItem('hera_onboarded', JSON.stringify('true')) — raw 'true' is NOT recognized and lands on /onboarding. To sign in a new OTP user, run `python /app/backend/tests/otp_override_watcher.py <email> 4321 300 &` then enter 4321 in the app (it rewrites db.otps code_hash whenever a new code is issued). Onboarding automation: tap splash, then loop clicking 'Skip' if visible else fill visible inputs + 'Continue'/'Done'; final screen needs 'No' + partner text + 'Generate My Profile'; GeneratingScreen auto-navigates to /subscription?from=onboarding. Expo Router maps /(tabs) to URL '/'.",
+  "rca_of_issue": "Verified fix: previous thin subscription.tsx rendered only RevenueCatUI.Paywall -> empty offering -> 'Paywall is not available' dead end; Close -> /(tabs) -> SubscriptionGuard -> /subscription loop. Now local paywall is the default and native paywall only renders with packages; on web the empty-offerings state shows the retry UI and routing is stable."
+}

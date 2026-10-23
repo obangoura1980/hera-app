@@ -15,6 +15,7 @@ interface RevenueCatPaywallProps {
   offeringId?: string;
   onDismiss?: () => void;
   onPurchaseSuccess?: () => void;
+  onLoadError?: () => void;
 }
 
 export function RevenueCatPaywall({ onDismiss }: RevenueCatPaywallProps) {

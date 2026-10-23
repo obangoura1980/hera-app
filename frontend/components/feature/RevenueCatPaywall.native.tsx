@@ -20,12 +20,14 @@ interface RevenueCatPaywallProps {
   offeringId?: string; // Default: 'default'
   onDismiss?: () => void;
   onPurchaseSuccess?: () => void;
+  onLoadError?: () => void; // caller swaps in a local paywall instead of a dead-end
 }
 
 export function RevenueCatPaywall({
   offeringId = 'default',
   onDismiss,
   onPurchaseSuccess,
+  onLoadError,
 }: RevenueCatPaywallProps) {
   const { checkSubscription } = useSubscription();
   const { showAlert } = useAlert();
@@ -51,11 +53,13 @@ export function RevenueCatPaywall({
 
         if (isMounted) {
           setSelectedOffering(match);
+          if (!match?.availablePackages?.length) onLoadError?.();
         }
       } catch (err: any) {
         console.warn('[RevenueCatPaywall] Failed to fetch offerings:', err);
         if (isMounted) {
           setLoadError(err?.message || 'Failed to load paywall offerings.');
+          onLoadError?.();
         }
       } finally {
         if (isMounted) setLoading(false);

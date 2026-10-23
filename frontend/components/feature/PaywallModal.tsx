@@ -17,6 +17,7 @@ export function PaywallModal({
   visible,
   offeringId = 'default',
   onClose,
+  onViewPlans,
 }: PaywallModalProps) {
   return (
     <Modal
@@ -30,6 +31,7 @@ export function PaywallModal({
         offeringId={offeringId}
         onDismiss={onClose}
         onPurchaseSuccess={onClose}
+        onLoadError={onViewPlans ?? onClose}
       />
     </Modal>
   );
