@@ -136,3 +136,4 @@
 ## Update (2026-10-21) — paywall prices matched
 - subscription.tsx fallback prices now $12.99/mo, $89.99/yr ($7.50/mo); savings labels 30% -> 42% (89.99 vs 12.99x12=155.88)
 - OPEN: onboarding.tsx PLANS shows a 'Founding Member $7.99/month' option with no matching store product — awaiting user decision
+- Removed 'Founding Member $7.99/month' from onboarding PLANS (no store product); selectedPlan type now 'annual'|'premium'. selectedPlan is display-only (purchase happens on /subscription)

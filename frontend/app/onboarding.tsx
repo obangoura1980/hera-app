@@ -614,7 +614,6 @@ function ReferralScreen({
 const PLANS = [
   { id: 'annual' as const, label: 'Annual', price: '$89.99', period: '/ year', monthly: '$7.50/mo', badge: 'Most Popular', highlight: true },
   { id: 'premium' as const, label: 'Monthly', price: '$12.99', period: '/ month', monthly: null, badge: null, highlight: false },
-  { id: 'founding' as const, label: 'Founding Member', price: '$7.99', period: '/ month', monthly: null, badge: 'Limited', highlight: false },
 ];
 
 // Resume position is tracked in @/src/onboarding-progress
@@ -668,7 +667,7 @@ export default function Onboarding() {
   const [specificPerson, setSpecificPerson] = useAnswerState('specificPerson', '');
 
   const [contactModal, setContactModal] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useAnswerState<'annual' | 'premium' | 'founding'>('selectedPlan', 'annual');
+  const [selectedPlan, setSelectedPlan] = useAnswerState<'annual' | 'premium'>('selectedPlan', 'annual');
 
   const { sendOTP, verifyOTPAndLogin } = useAuth();
 
