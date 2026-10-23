@@ -33,9 +33,9 @@ const TERMS_URL = 'https://downloadhera.com/terms';
 const PRIVACY_URL = 'https://downloadhera.com/privacy';
 
 // ── Static pricing fallbacks (shown if StoreKit product list is empty) ────────
-const FALLBACK_MONTHLY_PRICE  = '$9.99';
-const FALLBACK_YEARLY_PRICE   = '$83.88';
-const FALLBACK_YEARLY_MONTHLY = '$6.99';
+const FALLBACK_MONTHLY_PRICE  = '$12.99';
+const FALLBACK_YEARLY_PRICE   = '$89.99';
+const FALLBACK_YEARLY_MONTHLY = '$7.50';
 
 type BillingCycle = 'monthly' | 'yearly';
 
@@ -125,7 +125,7 @@ function TrialSummaryStep({
                     </Text>
                   )}
                 </View>
-                {b === 'yearly' && <View style={ts.savePill}><Text style={ts.savePillTxt}>Save 30%</Text></View>}
+                {b === 'yearly' && <View style={ts.savePill}><Text style={ts.savePillTxt}>Save 42%</Text></View>}
               </Pressable>
             );
           })}
@@ -173,7 +173,7 @@ function TrialSummaryStep({
             <View style={[ts.savingsRow, { backgroundColor: isDark ? 'rgba(52,211,153,0.08)' : 'rgba(52,211,153,0.07)', borderColor: 'rgba(52,211,153,0.25)' }]}>
               <Ionicons name="gift" size={14} color="#34D399" />
               <Text style={[ts.savingsTxt, { color: isDark ? '#34D399' : '#1A6646' }]}>
-                Billed annually at {yearlyPriceStr} · Save ~30% vs monthly
+                Billed annually at {yearlyPriceStr} · Save ~42% vs monthly
               </Text>
             </View>
           )}

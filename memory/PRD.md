@@ -132,3 +132,7 @@
 - RevenueCatPaywall.native: calls onLoadError on fetch error or empty offering. PaywallModal: onLoadError -> onViewPlans (opens local /subscription). SubscriptionContext.showPaywall: skips presentPaywall when offering has no packages. Re-added refetchOfferings + purchasePlan live-refetch to SubscriptionContext (repo version dropped them)
 - index.tsx waits for statusLoaded (onboarded users) before redirecting, so subscribers don't flash through /subscription
 - Testing agent iteration 30: 6/6 flows pass (onboarding -> /subscription once, stable 12s; hera_onboarded persisted; local paywall + Tap-to-retry; no loop; demo stays on Home; no max-update-depth). Added 6s timeout fallback in index.tsx so a hung status check never leaves a blank screen
+
+## Update (2026-10-21) — paywall prices matched
+- subscription.tsx fallback prices now $12.99/mo, $89.99/yr ($7.50/mo); savings labels 30% -> 42% (89.99 vs 12.99x12=155.88)
+- OPEN: onboarding.tsx PLANS shows a 'Founding Member $7.99/month' option with no matching store product — awaiting user decision
