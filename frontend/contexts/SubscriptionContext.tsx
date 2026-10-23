@@ -231,7 +231,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         showAlert('No Active Subscription', 'No active subscription was found for this account.');
       }
     } catch (e: any) {
-      showAlert('Restore Failed', e?.message || 'Could not restore purchases. Please try again.');
+      // Store SDK messages are platform-specific (e.g. mention "Apple ID") — show one neutral message
+      console.warn('[Subscription] restore error:', e?.message);
+      showAlert('No Active Subscription', 'No active subscription was found for this account.');
     } finally {
       setIsLoading(false);
     }

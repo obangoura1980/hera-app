@@ -121,3 +121,7 @@
 - Likely cause: expo-image-picker plugin had cameraPermission:false + microphonePermission:false -> NSCameraUsageDescription/NSMicrophoneUsageDescription absent while the linked picker binary references camera APIs -> Apple post-upload processing rejects (ITMS-90683), build never appears in ASC (Apple emails the account holder)
 - Fix: real camera/mic purpose strings + ios.infoPlist ITSAppUsesNonExemptEncryption=false. Verified via expo config introspect: all Usage strings present, bundle com.hera.herapp, version 6.0.0
 - Other possible causes if it recurs: build uploaded under a different Apple team/app record; still processing (up to ~1h); build number already used
+
+## Update (2026-10-21) — demo premium confirm + restore message
+- Demo premium (already in place, re-verified): DB is_premium=true (seed + get_or_create_demo_user re-asserts), PREMIUM_BYPASS_EMAILS (GET /api/subscription subscribed:true, /auth/me is_premium:true), frontend isDemoEmail -> isSubscribed
+- Restore messages: SubscriptionContext restore catch no longer shows raw store SDK text (could mention 'Apple ID'); shows 'No Active Subscription' / 'No active subscription was found for this account.' Native RevenueCat paywall: onRestoreCompleted without entitlement + onRestoreError now show the same message. RevenueCatUI's own native dialogs (if any) are not app-controllable

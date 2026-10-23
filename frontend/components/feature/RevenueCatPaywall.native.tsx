@@ -12,6 +12,9 @@ import Purchases, { PurchasesOffering } from 'react-native-purchases';
 import { router } from 'expo-router';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useRCSubscription, REVENUECAT_ENTITLEMENT_IDENTIFIER } from '@/src/lib/revenuecat';
+import { useAlert } from '@/template';
+
+const NO_SUBSCRIPTION_MSG = 'No active subscription was found for this account.';
 
 interface RevenueCatPaywallProps {
   offeringId?: string; // Default: 'default'
@@ -25,6 +28,7 @@ export function RevenueCatPaywall({
   onPurchaseSuccess,
 }: RevenueCatPaywallProps) {
   const { checkSubscription } = useSubscription();
+  const { showAlert } = useAlert();
   const { offerings, isLoading: isRCLoading } = useRCSubscription();
   const [selectedOffering, setSelectedOffering] = useState<PurchasesOffering | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,9 +106,12 @@ export function RevenueCatPaywall({
           if (router.canDismiss()) router.dismissAll();
           router.replace('/(tabs)');
         }
+      } else {
+        showAlert('No Active Subscription', NO_SUBSCRIPTION_MSG);
       }
     } catch (e) {
       console.warn('[RevenueCatPaywall] Restore sync error:', e);
+      showAlert('No Active Subscription', NO_SUBSCRIPTION_MSG);
     }
   };
 
@@ -148,6 +155,7 @@ export function RevenueCatPaywall({
         }}
         onRestoreError={({ error }) => {
           console.warn('[RevenueCatPaywall] Restore error:', error);
+          showAlert('No Active Subscription', NO_SUBSCRIPTION_MSG);
         }}
       />
     </View>
