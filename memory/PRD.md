@@ -146,3 +146,9 @@
 - LogBox.ignoreLogs for RevenueCat/BILLING_UNAVAILABLE/no-products messages (root _layout)
 - Trial length (30 days per request) is configured store-side; paywall shows whatever stores return
 - Iteration 31: 10/10 pass. Follow-ups applied: Try again min 900ms spinner; offerings empty-poll capped at 5 refetches; fallback copy 'couldn't load subscription plans'; unused imports removed (tsc clean for subscription.tsx). OPEN (not fixed): onboarding.tsx still contains legacy hardcoded plan screen 25 (unreachable in normal flow); circular import SubscriptionContext->PaywallModal->RevenueCatPaywall->useSubscription (warning only)
+
+## 2026-10-21 — 'remote paywall not showing' diagnosis
+- Offering 'default' has paywall attached for test/ios/android keys. iOS + Android keys return both packages; Test Store key returns packages: [] 
+- react-native-purchases-ui 10.11.0 uses Preview API Mode on web + Expo Go (shouldUsePreviewAPIMode): <Paywall/> renders a fake 'Preview Paywall — Web paywalls are not supported yet'. Remote template can ONLY render in native dev/production builds. User's screenshot = web/Expo Go fallback (expected)
+- On TestFlight the paywall still needs StoreKit to return products (earlier error 'None of the products could be fetched') -> App Store Connect checks pending
+- Did NOT add REVENUECAT_SECRET_API_KEY to frontend .env (secret must never ship in the app bundle; app doesn't need it)
