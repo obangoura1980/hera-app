@@ -137,3 +137,12 @@
 - subscription.tsx fallback prices now $12.99/mo, $89.99/yr ($7.50/mo); savings labels 30% -> 42% (89.99 vs 12.99x12=155.88)
 - OPEN: onboarding.tsx PLANS shows a 'Founding Member $7.99/month' option with no matching store product — awaiting user decision
 - Removed 'Founding Member $7.99/month' from onboarding PLANS (no store product); selectedPlan type now 'annual'|'premium'. selectedPlan is display-only (purchase happens on /subscription)
+
+## Update (2026-10-21) — Dynamic RevenueCat paywall (soft paywall)
+- User decisions: keep iOS bundle com.hera.herapp (request said qc3zvj — rejected, live app is herapp); closing paywall / 'Continue to App' lets users in FREE; keep email sign-in before paywall
+- subscription.tsx rewritten: AuthGate -> PaywallStage. PaywallStage: loader while offerings load; RevenueCatUI.Paywall (offering 'default', remote template pw9af6c733f8134615 attached in RC dashboard — SDK has no template-id prop) only when native PaywallView + packages; else clean 'Plans are unavailable right now' with Continue to App / Try again / Restore. Removed hardcoded TrialSummary/Checkout steps + static prices
+- Purchase/restore with active 'pro' -> /(tabs); dismiss -> /(tabs). customerInfo listener already in revenuecat.tsx (addCustomerInfoUpdateListener)
+- Removed (tabs) SubscriptionGuard; index.tsx onboarded -> /(tabs) always. Premium gating now only via in-feature prompts (chat limit showPaywall)
+- LogBox.ignoreLogs for RevenueCat/BILLING_UNAVAILABLE/no-products messages (root _layout)
+- Trial length (30 days per request) is configured store-side; paywall shows whatever stores return
+- Iteration 31: 10/10 pass. Follow-ups applied: Try again min 900ms spinner; offerings empty-poll capped at 5 refetches; fallback copy 'couldn't load subscription plans'; unused imports removed (tsc clean for subscription.tsx). OPEN (not fixed): onboarding.tsx still contains legacy hardcoded plan screen 25 (unreachable in normal flow); circular import SubscriptionContext->PaywallModal->RevenueCatPaywall->useSubscription (warning only)

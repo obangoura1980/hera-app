@@ -76,10 +76,10 @@ function useSubscriptionContext() {
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
     // getOfferings() can RESOLVE with an empty package list (products being
     // propagated / dashboard reconfiguration) — react-query retry only fires
-    // on rejections, so poll gently until packages appear.
+    // on rejections, so poll gently (max ~5 times) until packages appear.
     refetchInterval: (query) => {
       const pkgs = query.state.data?.current?.availablePackages ?? [];
-      return pkgs.length === 0 ? 15000 : false;
+      return pkgs.length === 0 && query.state.dataUpdateCount < 5 ? 15000 : false;
     },
   });
 

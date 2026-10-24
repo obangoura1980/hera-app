@@ -29,9 +29,7 @@ export default function Index() {
   // New user — send to onboarding
   if (!onboarded) return <Redirect href="/onboarding" />;
 
-  // Onboarded + active subscription — go to main app
-  if (isSubscribed || isTrial) return <Redirect href="/(tabs)" />;
-
-  // Onboarded but no subscription — go to paywall
-  return <Redirect href="/subscription" />;
+  // Onboarded — the paywall was shown once at the end of onboarding; free users
+  // get the app with premium features gated by their own upgrade prompts.
+  return <Redirect href="/(tabs)" />;
 }

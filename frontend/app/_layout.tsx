@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AlertProvider, AuthProvider } from '@/template';
@@ -20,6 +20,10 @@ import { initializeRevenueCat, RCSubscriptionProvider } from '@/src/lib/revenuec
 
 // RevenueCat must be configured at module scope, once, before any component mounts.
 const queryClient = new QueryClient();
+// Simulators/emulators and unconfigured stores return no products (e.g.
+// BILLING_UNAVAILABLE / "could not fetch products") — the paywall handles that
+// with a "Continue to App" screen, so keep these SDK logs out of LogBox.
+LogBox.ignoreLogs([/\[RevenueCat\]/, /BILLING_UNAVAILABLE/, /None of the products registered/, /There is an issue with your configuration/]);
 try {
   initializeRevenueCat();
 } catch (err) {
