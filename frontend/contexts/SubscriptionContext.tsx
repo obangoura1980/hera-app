@@ -9,7 +9,7 @@
 import React, {
   createContext, useState, useCallback, useEffect, useRef, ReactNode,
 } from 'react';
-import { Platform, Linking, UIManager } from 'react-native';
+import { Platform, Linking, UIManager, AppState, AppStateStatus } from 'react-native';
 import { router } from 'expo-router';
 import Purchases from 'react-native-purchases';
 import AsyncStorage from '@/src/utils/async-storage';
@@ -167,6 +167,14 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const checkSubscription = useCallback(async () => {
     await Promise.allSettled([rc.refetchCustomerInfo(), checkServerBypass()]);
   }, [rc, checkServerBypass]);
+
+  // ── Re-verify entitlements on foreground (renewals / expirations) ──
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') checkSubscription();
+    });
+    return () => sub.remove();
+  }, [checkSubscription]);
 
   // ── Purchase a plan ─────────────────────────────────────────────────────────
   const purchasePlan = useCallback(async (productKey: 'monthly' | 'yearly') => {

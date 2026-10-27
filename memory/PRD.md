@@ -152,3 +152,10 @@
 - react-native-purchases-ui 10.11.0 uses Preview API Mode on web + Expo Go (shouldUsePreviewAPIMode): <Paywall/> renders a fake 'Preview Paywall — Web paywalls are not supported yet'. Remote template can ONLY render in native dev/production builds. User's screenshot = web/Expo Go fallback (expected)
 - On TestFlight the paywall still needs StoreKit to return products (earlier error 'None of the products could be fetched') -> App Store Connect checks pending
 - Did NOT add REVENUECAT_SECRET_API_KEY to frontend .env (secret must never ship in the app bundle; app doesn't need it)
+
+## Update (2026-10-27) — GitHub merge #2 (repo commits 3947b85..7c90db6)
+- TAKEN: onboarding.tsx (screen 25 now RevenueCatPaywall, removed legacy hardcoded plan screen + PLANS), revenuecat.tsx (ensureRevenueCat, isConfigured guard, setLogHandler demoting store-unavailable logs, native always uses real appl_/goog_ keys incl. dev builds), SubscriptionContext AppState foreground re-check, login returnTo default '/(tabs)', LogBox strings, app.json UIApplicationSceneManifest + expo-build-properties plugin (yarn expo install expo-build-properties@~57.0.22)
+- KEPT OURS: subscription.tsx (AuthGate + PaywallStage fallback), RevenueCatPaywall.native/.tsx split with onLoadError, showPaywall empty-offering guard, PaywallModal offeringId, bundle com.hera.herapp, version 6.0.0, ITSAppUsesNonExemptEncryption, camera/mic strings
+- RE-APPLIED on repo revenuecat.tsx: offerings retry/backoff + capped empty poll, refetchOfferings export; FIXED repo listener leak (cleanup returned inside .then never ran)
+- NOT COPIED: repo frontend/ios + frontend/android prebuilt native dirs (ios pbxproj has PRODUCT_BUNDLE_IDENTIFIER qc3zvj + version 1.0.7; presence would make EAS ignore app.json), package-lock.json (yarn project), unboundKey.jks (keystore — should not be in a public repo)
+- 2026-10-27: Re-checked GitHub (still commit 7c90db6, no new commits). Adopted repo Android versionCode 13. Kept: version 6.0.0, bundle com.hera.herapp, demo account protections, removed /premium/activate, RevenueCat remote paywall code.

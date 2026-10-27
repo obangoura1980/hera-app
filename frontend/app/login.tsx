@@ -211,7 +211,7 @@ export default function LoginScreen() {
   const { lockSync, triggerSync } = useHera();
   // Support returnTo param so callers can redirect back after auth
   const params = useLocalSearchParams<{ returnTo?: string }>();
-  const returnTo = (params.returnTo as string) || '/subscription';
+  const returnTo = (params.returnTo as string) || '/(tabs)';
 
   const [stage, setStage] = useState<Stage>('email');
   const [email, setEmail] = useState('');

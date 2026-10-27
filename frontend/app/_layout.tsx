@@ -23,7 +23,7 @@ const queryClient = new QueryClient();
 // Simulators/emulators and unconfigured stores return no products (e.g.
 // BILLING_UNAVAILABLE / "could not fetch products") — the paywall handles that
 // with a "Continue to App" screen, so keep these SDK logs out of LogBox.
-LogBox.ignoreLogs([/\[RevenueCat\]/, /BILLING_UNAVAILABLE/, /None of the products registered/, /There is an issue with your configuration/]);
+LogBox.ignoreLogs([/\[RevenueCat\]/, /BILLING_UNAVAILABLE/, /Billing is not available/, /Error fetching offerings/, /PurchaseNotAllowedError/, /None of the products registered/, /There is an issue with your configuration/]);
 try {
   initializeRevenueCat();
 } catch (err) {

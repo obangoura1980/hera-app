@@ -13,7 +13,18 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board",
         "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIApplicationSceneManifest": {
+          "UIApplicationSupportsMultipleScenes": false,
+          "UISceneConfigurations": {
+            "UIWindowSceneSessionRoleApplication": [
+              {
+                "UISceneConfigurationName": "Default Configuration",
+                "UISceneDelegateClassName": "EXExpoAppSceneDelegate"
+              }
+            ]
+          }
+        }
       }
     },
     "android": {
@@ -22,7 +33,7 @@
         "backgroundColor": "#1E0A3C"
       },
       "package": "com.hera.herapp",
-      "versionCode": 10
+      "versionCode": 13
     },
     "web": {
       "bundler": "metro",
@@ -71,7 +82,8 @@
           "preferAppsFlyerBackupRules": false
         }
       ],
-      "./plugins/withAndroidBackupRulesFix"
+      "./plugins/withAndroidBackupRulesFix",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
