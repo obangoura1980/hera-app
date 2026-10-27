@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable, TextInput,
-  Dimensions, Platform, Animated, Modal, Linking, Keyboard,
+  Dimensions, Platform, Animated, Modal, Linking, Keyboard, DimensionValue,
 } from 'react-native';
 import { Audio } from '@/src/utils/av-shim';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,6 +29,7 @@ import { KeyboardAwareScrollView, KeyboardStickyView, KeyboardAvoidingView } fro
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/template';
 import { getLastOnboardingScreen, setLastOnboardingScreen, getAnswer, setAnswer } from '@/src/onboarding-progress';
+import { RevenueCatPaywall } from '@/components/feature/RevenueCatPaywall';
 
 /** useState persisted in module memory so answers survive navigating away (e.g. to the sign-in gate) and back. */
 function useAnswerState<T>(key: string, initial: T) {
@@ -86,7 +87,7 @@ interface Contact { name: string; relationship: string; }
 // ── Typewriter Hook ────────────────────────────────────────────────────────────
 function useTypewriter(text: string, speed = 20, delay = 320): string {
   const [out, setOut] = useState('');
-  const t = useRef<ReturnType<typeof setTimeout>>();
+  const t = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     setOut('');
     let i = 0;
@@ -305,7 +306,7 @@ const QuestionLayout = React.memo(function QuestionLayout({ qNum, title, childre
   const displayed = useTypewriter(title, 20, 380);
   // Measured so KeyboardAwareScrollView can keep focused inputs clear of the sticky footer
   const [footerH, setFooterH] = useState(0);
-  const pct = `${Math.min(100, Math.round((qNum / TOTAL_Q) * 100))}%`;
+  const pct: DimensionValue = `${Math.min(100, Math.round((qNum / TOTAL_Q) * 100))}%`;
   return (
     <LinearGradient colors={[T('#080A18'), T('#0F1028'), T('#131838')]} style={{ flex: 1, paddingTop: insets.top }}>
       <View style={ql.header}>
@@ -456,7 +457,7 @@ function SplashScreen({ onContinue, onAudioStart, isMuted, onToggleMute }: { onC
         {onToggleMute ? (
           <View style={{ position: 'absolute', top: insets.top + 12, right: Spacing.lg, flexDirection: 'row', gap: Spacing.sm }} pointerEvents="box-none">
             <ThemeBtn />
-            <MuteBtn isMuted={!!isMuted} onToggle={(e) => { (e as any)?.stopPropagation?.(); onToggleMute(); }} />
+            <MuteBtn isMuted={!!isMuted} onToggle={onToggleMute} />
           </View>
         ) : null}
       </LinearGradient>
@@ -611,12 +612,6 @@ function ReferralScreen({
   );
 }
 
-const PLANS = [
-  { id: 'annual' as const, label: 'Annual', price: '$89.99', period: '/ year', monthly: '$7.50/mo', badge: 'Most Popular', highlight: true },
-  { id: 'premium' as const, label: 'Monthly', price: '$12.99', period: '/ month', monthly: null, badge: null, highlight: false },
-  { id: 'founding' as const, label: 'Founding Member', price: '$7.99', period: '/ month', monthly: null, badge: 'Limited', highlight: false },
-];
-
 // Resume position is tracked in @/src/onboarding-progress
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -628,7 +623,7 @@ export default function Onboarding() {
   const insets = useSafeAreaInsets();
   const { updateUser } = useHera();
   const { purchasePlan } = useSubscription();
-  const soundRef       = useRef<Audio.Sound | null>(null);
+  const soundRef       = useRef<any>(null);
   const autoStopTimer  = useRef<ReturnType<typeof setTimeout>  | null>(null);
   const fadeInInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeOutInterval= useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1045,135 +1040,13 @@ export default function Onboarding() {
     );
   }
 
-  // ── Screen 25: Paywall ──────────────────────────────────────────────────
-  const trialEndDate = new Date(Date.now() + 7 * 86400000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-
+  // ── Screen 25: RevenueCat Paywall ──────────────────────────────────────────
   return (
-    <View style={{ flex: 1 }}>
-      <LinearGradient colors={[T('#080A18'), T('#0D1035'), T('#131838')]} style={{ flex: 1, paddingTop: insets.top }}>
-        {/* Back to the last question — breaks the paywall ↔ sign-in loop */}
-        <Pressable
-          onPress={() => setScreen(23)}
-          hitSlop={12}
-          accessibilityLabel="Back to questions"
-          style={[ws.backBtn, { marginLeft: Spacing.lg, marginTop: Spacing.sm }]}
-        >
-          <Ionicons name="arrow-back" size={18} color={T('rgba(255,255,255,0.45)')} />
-        </Pressable>
-        <ScrollView
-          contentContainerStyle={[pw.scroll, { paddingBottom: insets.bottom + 140 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          <Countdown />
-
-          {/* Note from the team */}
-          <View style={pw.teamNote}>
-            <View style={pw.teamNoteHeader}>
-              <Ionicons name="sparkles" size={14} color={Colors.primaryLight} />
-              <Text style={pw.teamNoteTitle}>Note from the team</Text>
-            </View>
-            <Text style={pw.teamNoteTxt}>
-              We built Hera because everyone deserves a guide who truly sees them. Your stories and profile are now ready — start your free 7-day trial and experience the transformation for yourself.
-            </Text>
-            <Text style={pw.teamSig}>— The Hera Team</Text>
-          </View>
-
-          <View style={pw.header}>
-            <View style={pw.badge}>
-              <Ionicons name="gift" size={12} color={Colors.gold} />
-              <Text style={pw.badgeTxt}>7-DAY FREE TRIAL</Text>
-            </View>
-            <Text style={pw.title}>Unlock Your{'\n'}Full Potential</Text>
-            <Text style={pw.sub}>
-              Your personalized stories are ready. Try Hera Premium free for 7 days — no charge until your trial ends.
-            </Text>
-          </View>
-
-          <View style={pw.note}>
-            <Text style={{ fontSize: 20 }}>💜</Text>
-            <Text style={pw.noteTxt}>
-              We've crafted a deeply personalized journey just for you, {displayName}. Your profile is ready to guide every step.
-            </Text>
-          </View>
-
-          <View style={pw.promiseRow}>
-            {[
-              ['card-outline', 'No charge today'],
-              ['close-circle-outline', 'Cancel anytime'],
-              ['lock-closed-outline', 'Secure & private'],
-            ].map(([icon, t], i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name={icon as any} size={12} color={Colors.success} />
-                <Text style={{ fontSize: 11, color: Colors.success, fontWeight: '600' }}>{t}</Text>
-              </View>
-            ))}
-          </View>
-
-          <Text style={pw.planLabel}>CHOOSE YOUR PLAN</Text>
-          {PLANS.map(plan => (
-            <Pressable
-              key={plan.id}
-              onPress={() => setSelectedPlan(plan.id)}
-              style={({ pressed }) => [pw.plan, plan.highlight && pw.planHL, selectedPlan === plan.id && pw.planSel, pressed && { opacity: 0.88 }]}
-            >
-              {plan.highlight ? <LinearGradient colors={[T('rgba(168,85,247,0.1)'), T('rgba(236,72,153,0.05)')]} style={StyleSheet.absoluteFill} /> : null}
-              <View style={{ flex: 1, gap: 3 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={[pw.planName, selectedPlan === plan.id && { color: Colors.textWhite }]}>{plan.label}</Text>
-                  {plan.badge ? (
-                    <View style={[pw.planBadge, plan.highlight
-                      ? { backgroundColor: Colors.glassGold, borderColor: Colors.borderGold }
-                      : { backgroundColor: Colors.glassPurple, borderColor: Colors.border }
-                    ]}>
-                      <Text style={[{ fontSize: 10, fontWeight: '700' as const }, { color: plan.highlight ? Colors.gold : Colors.primaryLight }]}>
-                        {plan.badge}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                {plan.monthly ? <Text style={{ fontSize: FontSize.xs, color: Colors.success, fontWeight: '600' }}>{plan.monthly}</Text> : null}
-              </View>
-              <View style={{ alignItems: 'flex-end', gap: 1 }}>
-                <Text style={[pw.planPrice, selectedPlan === plan.id && { color: Colors.gold }]}>{plan.price}</Text>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.textSubtle }}>{plan.period}</Text>
-              </View>
-              <View style={[pw.radio, selectedPlan === plan.id && pw.radioSel]}>
-                {selectedPlan === plan.id ? <View style={pw.radioDot} /> : null}
-              </View>
-            </Pressable>
-          ))}
-
-          <View style={pw.reminderBox}>
-            <Ionicons name="information-circle-outline" size={14} color={Colors.textSubtle} />
-            <Text style={pw.reminderTxt}>
-              7-day free trial ends on{' '}
-              <Text style={{ color: Colors.textWhite, fontWeight: '600' }}>
-                {trialEndDate}
-              </Text>
-              . Cancel anytime before then — no charge.
-            </Text>
-          </View>
-        </ScrollView>
-
-        {/* Sticky CTA */}
-        <View style={[pw.cta, { paddingBottom: insets.bottom + Spacing.md }]}>
-          <Pressable
-            onPress={handleStartTrial}
-            style={({ pressed }) => [pw.ctaWrap, pressed && { opacity: 0.75 }]}
-          >
-            <LinearGradient colors={[T('#A855F7'), T('#EC4899')]} style={pw.ctaBtn}>
-              <Ionicons name="sparkles" size={17} color="white" />
-              <Text style={pw.ctaTxt}>View My Plan Options</Text>
-            </LinearGradient>
-          </Pressable>
-          <Text style={pw.ctaLegal}>No charge today · Cancel anytime · Secure Apple checkout</Text>
-          <View style={pw.footerLinks}>
-            <Pressable onPress={() => Linking.openURL('https://downloadhera.com/terms')} hitSlop={10}>
-              <Text style={pw.footerLink}>Terms of Use</Text>
-            </Pressable>
-          </View>
-        </View>
-      </LinearGradient>
+    <View style={{ flex: 1, backgroundColor: '#080415' }}>
+      <RevenueCatPaywall
+        onDismiss={() => persistAndNavigate('/(tabs)')}
+        onPurchaseSuccess={() => persistAndNavigate('/(tabs)')}
+      />
     </View>
   );
 }

@@ -7,9 +7,7 @@ import { RevenueCatPaywall } from '@/components/feature/RevenueCatPaywall';
 import Ionicons from '@react-native-vector-icons/ionicons';
 
 export default function SubscriptionScreen() {
-  const insets = useSafeAreaInsets();
   const { isSubscribed } = useSubscription();
-  const { offeringId = 'default' } = useLocalSearchParams<{ offeringId?: string }>();
 
   useEffect(() => {
     if (isSubscribed) {
@@ -29,23 +27,12 @@ export default function SubscriptionScreen() {
   return (
     <View style={st.container}>
       <RevenueCatPaywall
-        offeringId={offeringId}
         onDismiss={handleDismiss}
         onPurchaseSuccess={() => {
           if (router.canDismiss()) router.dismissAll();
           router.replace('/(tabs)');
         }}
       />
-      {/* Floating Close Button — ensures user can always dismiss & continue to app */}
-      <Pressable
-        style={[st.closeBtn, { top: Math.max(insets.top, 16) + 6 }]}
-        onPress={handleDismiss}
-        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        accessibilityLabel="Close paywall"
-        accessibilityRole="button"
-      >
-        <Ionicons name="close" size={22} color="#FFFFFF" />
-      </Pressable>
     </View>
   );
 }

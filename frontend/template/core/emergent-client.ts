@@ -40,7 +40,7 @@ const fail = (message: string) => ({ data: null, error: { message } });
 // Chainable no-op query builder (cloud sync tables are not used; data stays on device).
 function queryBuilder(): any {
   const result = Promise.resolve(ok([]));
-  const proxy: any = new Proxy(function () {}, {
+  const proxy: any = new Proxy(function () { }, {
     get: (_t, prop) => {
       if (prop === "then") return result.then.bind(result);
       if (prop === "catch") return result.catch.bind(result);

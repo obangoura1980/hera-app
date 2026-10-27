@@ -1,8 +1,16 @@
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+
+LogBox.ignoreLogs([
+  'Billing is not available in this device',
+  'Error fetching offerings',
+  'PurchaseNotAllowedError',
+  'None of the products registered in the RevenueCat dashboard could be fetched',
+  'There is an issue with your configuration',
+]);
 import { AlertProvider, AuthProvider } from '@/template';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { HeraProvider } from '@/contexts/HeraContext';

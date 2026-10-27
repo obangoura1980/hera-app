@@ -7,63 +7,32 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
-import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
-import Purchases, { PurchasesOffering } from 'react-native-purchases';
+import RevenueCatUI from 'react-native-purchases-ui';
 import { router } from 'expo-router';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useRCSubscription, REVENUECAT_ENTITLEMENT_IDENTIFIER, ensureRevenueCat } from '@/src/lib/revenuecat';
+import { REVENUECAT_ENTITLEMENT_IDENTIFIER, ensureRevenueCat } from '@/src/lib/revenuecat';
 
 interface RevenueCatPaywallProps {
-  offeringId?: string; // Default: 'default'
   onDismiss?: () => void;
   onPurchaseSuccess?: () => void;
 }
 
 export function RevenueCatPaywall({
-  offeringId = 'default',
   onDismiss,
   onPurchaseSuccess,
 }: RevenueCatPaywallProps) {
   const { checkSubscription } = useSubscription();
-  const { offerings, isLoading: isRCLoading } = useRCSubscription();
-  const [selectedOffering, setSelectedOffering] = useState<PurchasesOffering | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-
-    async function loadOffering() {
-      try {
-        setLoading(true);
-        setLoadError(null);
-        await ensureRevenueCat();
-
-        // Fetch fresh offerings if not available from context
-        const allOfferings = offerings || (await Purchases.getOfferings());
-        const match =
-          allOfferings?.all?.[offeringId] ||
-          allOfferings?.current ||
-          null;
-
-        if (isMounted) {
-          setSelectedOffering(match);
-        }
-      } catch (err: any) {
-        console.warn('[RevenueCatPaywall] Failed to fetch offerings:', err);
-        if (isMounted) {
-          setLoadError(err?.message || 'Failed to load paywall offerings.');
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    }
-
-    loadOffering();
+    ensureRevenueCat().then(() => {
+      if (isMounted) setReady(true);
+    });
     return () => {
       isMounted = false;
     };
-  }, [offeringId, offerings]);
+  }, []);
 
   const handleDismiss = () => {
     if (onDismiss) {
@@ -109,7 +78,7 @@ export function RevenueCatPaywall({
     }
   };
 
-  if (loading || isRCLoading) {
+  if (!ready) {
     return (
       <View style={st.centered}>
         <ActivityIndicator size="large" color="#FFFFFF" />
@@ -118,14 +87,12 @@ export function RevenueCatPaywall({
     );
   }
 
-  if (loadError) {
+  if (Platform.OS === 'web') {
     return (
       <View style={st.centered}>
         <Text style={st.errorTitle}>Hera Premium</Text>
         <Text style={st.errorText}>
-          {loadError.includes('singleton')
-            ? 'Preparing store options. You can continue exploring Hera.'
-            : loadError}
+          In-app purchases are available on the mobile app. Please open Hera on your iOS or Android device.
         </Text>
         <Pressable style={st.retryBtn} onPress={handleDismiss}>
           <Text style={st.retryBtnText}>Continue to App</Text>
@@ -134,13 +101,12 @@ export function RevenueCatPaywall({
     );
   }
 
-  // Render the RevenueCat UI Paywall component
+  // Pure Paywall UI — automatically loads the Paywall configured in RevenueCat
   return (
     <View style={st.container}>
       <RevenueCatUI.Paywall
         style={st.paywall}
         options={{
-          offering: selectedOffering || undefined,
           displayCloseButton: true,
         }}
         onPurchaseCompleted={({ customerInfo }) => handlePurchaseCompleted(customerInfo)}

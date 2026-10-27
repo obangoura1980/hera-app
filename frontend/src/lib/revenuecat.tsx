@@ -22,21 +22,12 @@ export const rcEnabled = Platform.OS !== "web" || __DEV__; // web preview uses t
 
 function getRevenueCatApiKey() {
   if (Platform.OS === "web") {
-    if (!REVENUECAT_TEST_API_KEY) {
-      console.warn("[RevenueCat] REVENUECAT_TEST_API_KEY is not defined");
-    }
     return REVENUECAT_TEST_API_KEY || "";
   }
   if (Platform.OS === "ios") {
-    if (!REVENUECAT_IOS_API_KEY) {
-      console.warn("[RevenueCat] REVENUECAT_IOS_API_KEY is not defined");
-    }
     return REVENUECAT_IOS_API_KEY || "";
   }
   if (Platform.OS === "android") {
-    if (!REVENUECAT_ANDROID_API_KEY) {
-      console.warn("[RevenueCat] REVENUECAT_ANDROID_API_KEY is not defined");
-    }
     return REVENUECAT_ANDROID_API_KEY || "";
   }
   return REVENUECAT_TEST_API_KEY || "";
@@ -54,6 +45,22 @@ export function initializeRevenueCat() {
   }
   try {
     Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.WARN);
+    Purchases.setLogHandler((logLevel, message) => {
+      if (
+        message.includes('Billing is not available') ||
+        message.includes('BILLING_UNAVAILABLE') ||
+        message.includes('PurchaseNotAllowedError') ||
+        message.includes('None of the products registered in the RevenueCat dashboard could be fetched') ||
+        message.includes('StoreKit Configuration')
+      ) {
+        // Demote to info so it doesn't trigger red/yellow LogBox modal on unconfigured emulators/simulators
+        console.info('[RevenueCat]', message);
+      } else if (logLevel === LOG_LEVEL.ERROR) {
+        console.error('[RevenueCat]', message);
+      } else if (logLevel === LOG_LEVEL.WARN) {
+        console.warn('[RevenueCat]', message);
+      }
+    });
     Purchases.configure({ apiKey });
     isConfigured = true;
   } catch (err) {

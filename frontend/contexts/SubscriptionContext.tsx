@@ -30,31 +30,31 @@ export const FREE_CHAT_LIMIT = 5;
 export type Plan = 'free' | 'monthly' | 'yearly';
 
 const PLAN_LABELS: Record<Plan, string> = {
-  free:    'Free',
+  free: 'Free',
   monthly: 'Monthly',
-  yearly:  'Annual',
+  yearly: 'Annual',
 };
 
 interface SubscriptionContextType {
   // State
-  isLoading:      boolean;
-  isPurchasing:   boolean;
-  isSubscribed:   boolean;
-  isTrial:        boolean;
-  plan:           Plan;
-  planLabel:      string;
+  isLoading: boolean;
+  isPurchasing: boolean;
+  isSubscribed: boolean;
+  isTrial: boolean;
+  plan: Plan;
+  planLabel: string;
   subscriptionEnd: string | null;
   dailyChatCount: number;
-  canSendChat:    boolean;
-  iapProducts:    IAPSubscription[];
-  statusLoaded:   boolean;
+  canSendChat: boolean;
+  iapProducts: IAPSubscription[];
+  statusLoaded: boolean;
   // Actions
-  checkSubscription:  () => Promise<void>;
-  purchasePlan:       (productKey: 'monthly' | 'yearly') => Promise<void>;
+  checkSubscription: () => Promise<void>;
+  purchasePlan: (productKey: 'monthly' | 'yearly') => Promise<void>;
   restoreSubscription: () => Promise<void>;
   incrementChatCount: () => void;
-  showPaywall:        (feature?: string, offeringId?: string) => void;
-  hidePaywall:        () => void;
+  showPaywall: (feature?: string, offeringId?: string) => void;
+  hidePaywall: () => void;
   // App Store subscription management
   openPortal: () => Promise<void>;
 }
@@ -68,13 +68,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { showAlert } = useAlert();
   const rc = useRCSubscription();
 
-  const [isLoading,       setIsLoading]       = useState(false);
-  const [serverBypass,    setServerBypass]    = useState(false); // owner allowlist
-  const [serverPlan,      setServerPlan]      = useState<Plan>('yearly');
-  const [bypassChecked,   setBypassChecked]   = useState(false);
-  const [dailyChatCount,  setDailyChatCount]  = useState(0);
-  const [paywallVisible,  setPaywallVisible]  = useState(false);
-  const [paywallFeature,  setPaywallFeature]  = useState('AI Feature');
+  const [isLoading, setIsLoading] = useState(false);
+  const [serverBypass, setServerBypass] = useState(false); // owner allowlist
+  const [serverPlan, setServerPlan] = useState<Plan>('yearly');
+  const [bypassChecked, setBypassChecked] = useState(false);
+  const [dailyChatCount, setDailyChatCount] = useState(0);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState('AI Feature');
   const [paywallOfferingId, setPaywallOfferingId] = useState('default');
   const [purchaseIdentityError, setPurchaseIdentityError] = useState<string | null>(null);
   const rcIdentityRef = useRef<string | null>(null);
@@ -158,7 +158,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         if (parsed.date === new Date().toDateString()) {
           setDailyChatCount(parsed.count ?? 0);
         }
-      } catch {}
+      } catch { }
     });
   }, []);
 
@@ -266,18 +266,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       AsyncStorage.setItem(DAILY_CHAT_KEY, JSON.stringify({
         date: new Date().toDateString(),
         count: next,
-      })).catch(() => {});
+      })).catch(() => { });
       return next;
     });
   }, []);
 
-  const showPaywall = useCallback(async (feature = 'Premium Feature', offeringId = 'default') => {
+  const showPaywall = useCallback(async (feature = 'Premium Feature') => {
     try {
-      if (Platform.OS !== 'web' && UIManager.getViewManagerConfig('PaywallView') != null) {
+      if (Platform.OS !== 'web') {
         const RevenueCatUI = require('react-native-purchases-ui').default;
-        const targetOffering = rc.offerings?.all?.[offeringId] || rc.offerings?.current || undefined;
         const result = await RevenueCatUI.presentPaywall({
-          offering: targetOffering,
           displayCloseButton: true,
         });
         if (result === 'PURCHASED' || result === 'RESTORED') {
@@ -286,12 +284,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return;
       }
     } catch (e) {
-      console.log('[Paywall] RevenueCatUI presentPaywall error, using in-app modal:', e);
+      console.log('[Paywall] RevenueCatUI presentPaywall error, navigating to /subscription:', e);
     }
-    setPaywallFeature(feature);
-    setPaywallOfferingId(offeringId);
-    setPaywallVisible(true);
-  }, [checkSubscription, rc.offerings]);
+    router.push('/subscription');
+  }, [checkSubscription]);
 
   const hidePaywall = useCallback(() => setPaywallVisible(false), []);
 
@@ -322,12 +318,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       <PaywallModal
         visible={paywallVisible}
         feature={paywallFeature}
-        offeringId={paywallOfferingId}
         chatCount={dailyChatCount}
         chatLimit={FREE_CHAT_LIMIT}
         onClose={hidePaywall}
-        onCheckout={() => { hidePaywall(); router.push({ pathname: '/subscription', params: { offeringId: paywallOfferingId } }); }}
-        onViewPlans={() => { hidePaywall(); router.push({ pathname: '/subscription', params: { offeringId: paywallOfferingId } }); }}
+        onCheckout={() => { hidePaywall(); router.push('/subscription'); }}
+        onViewPlans={() => { hidePaywall(); router.push('/subscription'); }}
       />
     </SubscriptionContext.Provider>
   );
