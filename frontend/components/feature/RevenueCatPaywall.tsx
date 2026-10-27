@@ -11,7 +11,7 @@ import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 import Purchases, { PurchasesOffering } from 'react-native-purchases';
 import { router } from 'expo-router';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useRCSubscription, REVENUECAT_ENTITLEMENT_IDENTIFIER } from '@/src/lib/revenuecat';
+import { useRCSubscription, REVENUECAT_ENTITLEMENT_IDENTIFIER, ensureRevenueCat } from '@/src/lib/revenuecat';
 
 interface RevenueCatPaywallProps {
   offeringId?: string; // Default: 'default'
@@ -37,6 +37,7 @@ export function RevenueCatPaywall({
       try {
         setLoading(true);
         setLoadError(null);
+        await ensureRevenueCat();
 
         // Fetch fresh offerings if not available from context
         const allOfferings = offerings || (await Purchases.getOfferings());
@@ -120,10 +121,14 @@ export function RevenueCatPaywall({
   if (loadError) {
     return (
       <View style={st.centered}>
-        <Text style={st.errorTitle}>Paywall Unavailable</Text>
-        <Text style={st.errorText}>{loadError}</Text>
+        <Text style={st.errorTitle}>Hera Premium</Text>
+        <Text style={st.errorText}>
+          {loadError.includes('singleton')
+            ? 'Preparing store options. You can continue exploring Hera.'
+            : loadError}
+        </Text>
         <Pressable style={st.retryBtn} onPress={handleDismiss}>
-          <Text style={st.retryBtnText}>Close</Text>
+          <Text style={st.retryBtnText}>Continue to App</Text>
         </Pressable>
       </View>
     );

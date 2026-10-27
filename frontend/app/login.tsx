@@ -211,7 +211,7 @@ export default function LoginScreen() {
   const { lockSync, triggerSync } = useHera();
   // Support returnTo param so callers can redirect back after auth
   const params = useLocalSearchParams<{ returnTo?: string }>();
-  const returnTo = (params.returnTo as string) || '/subscription';
+  const returnTo = (params.returnTo as string) || '/(tabs)';
 
   const [stage, setStage] = useState<Stage>('email');
   const [email, setEmail] = useState('');
@@ -343,11 +343,11 @@ export default function LoginScreen() {
         setShowRestoreModal(true);
       } else {
         triggerSync('local_only');
-        router.replace('/subscription');
+        router.replace(returnTo as any);
       }
     } catch {
       triggerSync('merge');
-      router.replace('/subscription');
+      router.replace(returnTo as any);
     } finally { setIsCheckingCloud(false); }
   }, [otp, normalizedEmail, verifyOTPAndLogin, showAlert, lockSync, triggerSync, returnTo]);
 
@@ -564,7 +564,7 @@ export default function LoginScreen() {
 
             // Step 4: all clear — apply restore, then navigate
             await triggerSync('restore');
-            try { router.replace('/subscription'); } catch { }
+            try { router.replace(returnTo as any); } catch { }
 
           } catch (e) {
             // Outermost catch: something unexpected — never leave user stranded
@@ -583,7 +583,7 @@ export default function LoginScreen() {
           } catch (e) {
             console.warn('[Login] Start fresh failed:', e);
           } finally {
-            try { router.replace('/subscription'); } catch { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } }
+            try { router.replace(returnTo as any); } catch { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } }
           }
         }}
       />

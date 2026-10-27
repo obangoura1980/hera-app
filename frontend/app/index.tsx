@@ -25,9 +25,6 @@ export default function Index() {
   // New user — send to onboarding
   if (!onboarded) return <Redirect href="/onboarding" />;
 
-  // Onboarded + active subscription — go to main app
-  if (isSubscribed || isTrial) return <Redirect href="/(tabs)" />;
-
-  // Onboarded but no subscription — go to paywall
-  return <Redirect href="/subscription" />;
+  // Onboarded user — go to main app
+  return <Redirect href="/(tabs)" />;
 }

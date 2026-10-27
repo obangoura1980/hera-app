@@ -20,20 +20,7 @@ const NAV_ITEMS: {
   { route: 'profile',  iconOff: 'person-outline',  iconOn: 'person' },
 ];
 
-// ── Subscription guard — blocks unsubscribed users from accessing tabs ─────────
-// Waits until auth and the first subscription check have resolved so paying
-// users are never bounced to the paywall while their status is still loading.
-function SubscriptionGuard() {
-  const { isSubscribed, isTrial, isLoading, statusLoaded } = useSubscription();
-  const { loading: authLoading } = useAuth();
-  useEffect(() => {
-    if (authLoading || isLoading || !statusLoaded) return;
-    if (!isSubscribed && !isTrial) {
-      router.replace('/subscription');
-    }
-  }, [isSubscribed, isTrial, isLoading, statusLoaded, authLoading]);
-  return null;
-}
+
 
 // ── Floating Capsule Tab Bar ───────────────────────────────────────────────────
 function FloatingTabBar({ state, navigation }: any) {
@@ -114,19 +101,16 @@ const fn = StyleSheet.create({
 // ── Layout ────────────────────────────────────────────────────────────────────
 export default function TabLayout() {
   return (
-    <>
-      <SubscriptionGuard />
-      <Tabs
-        tabBar={(props) => <FloatingTabBar {...props} />}
-        screenOptions={{ headerShown: false }}
-      >
-        <Tabs.Screen name="index" />
-        <Tabs.Screen name="chat" />
-        <Tabs.Screen name="vision" />
-        <Tabs.Screen name="journal" />
-        <Tabs.Screen name="discover" />
-        <Tabs.Screen name="profile" />
-      </Tabs>
-    </>
+    <Tabs
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="chat" />
+      <Tabs.Screen name="vision" />
+      <Tabs.Screen name="journal" />
+      <Tabs.Screen name="discover" />
+      <Tabs.Screen name="profile" />
+    </Tabs>
   );
 }

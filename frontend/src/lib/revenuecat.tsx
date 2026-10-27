@@ -9,30 +9,68 @@ import Purchases, { LOG_LEVEL } from "react-native-purchases";
 import type { CustomerInfo, PurchasesPackage } from "react-native-purchases";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-const REVENUECAT_TEST_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
-const REVENUECAT_IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY;
-const REVENUECAT_ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
+const REVENUECAT_TEST_API_KEY =
+  process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY || "test_DVTXvbpqNHTxfpwfxYwOVtIgyNc";
+const REVENUECAT_IOS_API_KEY =
+  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || "appl_nRHvPjOiMewtpDZxFfXIoTHznjo";
+const REVENUECAT_ANDROID_API_KEY =
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || "goog_CNkLLDrwBXistuBcTZgizldcrwG";
 
 export const REVENUECAT_ENTITLEMENT_IDENTIFIER = "pro"; // from setup: entitlement_lookup_key
 
 export const rcEnabled = Platform.OS !== "web" || __DEV__; // web preview uses the Test Store
 
 function getRevenueCatApiKey() {
-  if (!REVENUECAT_TEST_API_KEY || !REVENUECAT_IOS_API_KEY || !REVENUECAT_ANDROID_API_KEY) {
-    throw new Error("RevenueCat public API keys not found — run the Setup section first");
+  if (Platform.OS === "web") {
+    if (!REVENUECAT_TEST_API_KEY) {
+      console.warn("[RevenueCat] REVENUECAT_TEST_API_KEY is not defined");
+    }
+    return REVENUECAT_TEST_API_KEY || "";
   }
-  if (Platform.OS === "web" || __DEV__) {
-    return REVENUECAT_TEST_API_KEY; // Expo Go, and the web preview use the RevenueCat Test Store
+  if (Platform.OS === "ios") {
+    if (!REVENUECAT_IOS_API_KEY) {
+      console.warn("[RevenueCat] REVENUECAT_IOS_API_KEY is not defined");
+    }
+    return REVENUECAT_IOS_API_KEY || "";
   }
-  if (Platform.OS === "ios") return REVENUECAT_IOS_API_KEY;
-  if (Platform.OS === "android") return REVENUECAT_ANDROID_API_KEY;
-  return REVENUECAT_TEST_API_KEY;
+  if (Platform.OS === "android") {
+    if (!REVENUECAT_ANDROID_API_KEY) {
+      console.warn("[RevenueCat] REVENUECAT_ANDROID_API_KEY is not defined");
+    }
+    return REVENUECAT_ANDROID_API_KEY || "";
+  }
+  return REVENUECAT_TEST_API_KEY || "";
 }
 
+let isConfigured = false;
+
 export function initializeRevenueCat() {
+  if (isConfigured) return;
   if (!rcEnabled) return; // no store on production web
-  Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.WARN);
-  Purchases.configure({ apiKey: getRevenueCatApiKey() });
+  const apiKey = getRevenueCatApiKey();
+  if (!apiKey) {
+    console.warn(`[RevenueCat] Skipped configure: no API key found for ${Platform.OS}`);
+    return;
+  }
+  try {
+    Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.DEBUG : LOG_LEVEL.WARN);
+    Purchases.configure({ apiKey });
+    isConfigured = true;
+  } catch (err) {
+    console.warn("[RevenueCat] Configure error:", err);
+  }
+}
+
+export async function ensureRevenueCat(): Promise<boolean> {
+  if (isConfigured) return true;
+  initializeRevenueCat();
+  try {
+    const configured = await Purchases.isConfigured();
+    if (configured) isConfigured = true;
+    return configured;
+  } catch {
+    return isConfigured;
+  }
 }
 
 // RevenueCat identity — originalAppUserId stays "$RCAnonymousID:…" after the
@@ -43,6 +81,7 @@ let currentAppUserId: string | null = null;
 const identitySubs = new Set<() => void>();
 const notifyIdentity = () => identitySubs.forEach(cb => cb());
 export async function rcLogIn(userId: string) {
+  await ensureRevenueCat();
   const res = await Purchases.logIn(userId);
   currentAppUserId = userId;
   notifyIdentity();
@@ -51,7 +90,14 @@ export async function rcLogIn(userId: string) {
 export async function rcLogOut() {
   currentAppUserId = null;
   notifyIdentity();
-  await Purchases.logOut();
+  try {
+    const ok = await ensureRevenueCat();
+    if (ok) {
+      await Purchases.logOut();
+    }
+  } catch (e) {
+    console.warn("[RevenueCat] rcLogOut error:", e);
+  }
 }
 export const getRCAppUserId = () => currentAppUserId;
 
@@ -60,14 +106,20 @@ function useSubscriptionContext() {
 
   const customerInfoQuery = useQuery({
     queryKey: ["revenuecat", "customer-info"],
-    queryFn: () => Purchases.getCustomerInfo(),
+    queryFn: async () => {
+      await ensureRevenueCat();
+      return Purchases.getCustomerInfo();
+    },
     enabled: rcEnabled,
     staleTime: 60 * 1000,
   });
 
   const offeringsQuery = useQuery({
     queryKey: ["revenuecat", "offerings"],
-    queryFn: () => Purchases.getOfferings(),
+    queryFn: async () => {
+      await ensureRevenueCat();
+      return Purchases.getOfferings();
+    },
     enabled: rcEnabled,
     staleTime: 300 * 1000,
   });
@@ -76,16 +128,24 @@ function useSubscriptionContext() {
   // purchases, restores, renewals, and logIn/logOut. Never poll for this.
   useEffect(() => {
     if (!rcEnabled) return;
-    const listener = (info: CustomerInfo) =>
-      queryClient.setQueryData(["revenuecat", "customer-info"], info);
-    Purchases.addCustomerInfoUpdateListener(listener);
-    return () => {
-      Purchases.removeCustomerInfoUpdateListener(listener);
-    };
+    ensureRevenueCat().then((ok) => {
+      if (!ok) return;
+      try {
+        const listener = (info: CustomerInfo) =>
+          queryClient.setQueryData(["revenuecat", "customer-info"], info);
+        Purchases.addCustomerInfoUpdateListener(listener);
+        return () => {
+          Purchases.removeCustomerInfoUpdateListener(listener);
+        };
+      } catch (err) {
+        console.warn("[RevenueCat] CustomerInfoUpdateListener error:", err);
+      }
+    });
   }, [queryClient]);
 
   const purchaseMutation = useMutation({
     mutationFn: async (packageToPurchase: PurchasesPackage) => {
+      await ensureRevenueCat();
       // Choke point: never let an anonymous purchase through.
       if (!currentAppUserId) throw new Error("identity_not_ready");
       const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
@@ -94,7 +154,10 @@ function useSubscriptionContext() {
   });
 
   const restoreMutation = useMutation({
-    mutationFn: () => Purchases.restorePurchases(),
+    mutationFn: async () => {
+      await ensureRevenueCat();
+      return Purchases.restorePurchases();
+    },
   });
 
   const isSubscribed =
