@@ -1,7 +1,9 @@
 /**
  * revenuecat.tsx — RevenueCat client (offerings, purchases, restore, identity).
  * Gating source of truth: customerInfo.entitlements.active['pro'].
- * Expo Go / web preview run against the RevenueCat Test Store (simulated purchases).
+ * Web preview runs against the RevenueCat Test Store (simulated purchases).
+ * Native builds always use their platform store key, including development and
+ * sandbox builds, so StoreKit/Play Billing can load the real configured products.
  */
 import React, { createContext, useContext, useEffect, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
@@ -10,23 +12,51 @@ import type { CustomerInfo, PurchasesPackage } from "react-native-purchases";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const REVENUECAT_TEST_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY;
-const REVENUECAT_IOS_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY;
+// RevenueCat public SDK keys are designed to ship in the client. Pin the App
+// Store key to the com.hera.herapp entry so a stale build-service environment
+// variable cannot silently compile a key for an older RevenueCat app.
+const REVENUECAT_IOS_API_KEY = "appl_nRHvPjOiMewtpDZxFfXIoTHznjo";
 const REVENUECAT_ANDROID_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY;
 
 export const REVENUECAT_ENTITLEMENT_IDENTIFIER = "pro"; // from setup: entitlement_lookup_key
 
 export const rcEnabled = Platform.OS !== "web" || __DEV__; // web preview uses the Test Store
 
-function getRevenueCatApiKey() {
-  if (!REVENUECAT_TEST_API_KEY || !REVENUECAT_IOS_API_KEY || !REVENUECAT_ANDROID_API_KEY) {
-    throw new Error("RevenueCat public API keys not found — run the Setup section first");
+function requireRevenueCatKey(
+  name: string,
+  value: string | undefined,
+  expectedPrefix: "appl_" | "goog_" | "test_",
+) {
+  const key = value?.trim();
+  if (!key) {
+    throw new Error(`${name} is missing from the build environment`);
   }
-  if (Platform.OS === "web" || __DEV__) {
-    return REVENUECAT_TEST_API_KEY; // Expo Go, and the web preview use the RevenueCat Test Store
+  if (!key.startsWith(expectedPrefix)) {
+    throw new Error(`${name} must use a ${expectedPrefix} RevenueCat public SDK key`);
   }
-  if (Platform.OS === "ios") return REVENUECAT_IOS_API_KEY;
-  if (Platform.OS === "android") return REVENUECAT_ANDROID_API_KEY;
-  return REVENUECAT_TEST_API_KEY;
+  return key;
+}
+
+export function getRevenueCatApiKey() {
+  if (Platform.OS === "ios") {
+    return requireRevenueCatKey(
+      "EXPO_PUBLIC_REVENUECAT_IOS_API_KEY",
+      REVENUECAT_IOS_API_KEY,
+      "appl_",
+    );
+  }
+  if (Platform.OS === "android") {
+    return requireRevenueCatKey(
+      "EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY",
+      REVENUECAT_ANDROID_API_KEY,
+      "goog_",
+    );
+  }
+  return requireRevenueCatKey(
+    "EXPO_PUBLIC_REVENUECAT_TEST_API_KEY",
+    REVENUECAT_TEST_API_KEY,
+    "test_",
+  );
 }
 
 export function initializeRevenueCat() {
