@@ -1,9 +1,9 @@
 {
   "name": "frontend",
   "main": "expo-router/entry",
-  "version": "1.0.9",
+  "version": "7.0.0",
   "scripts": {
-    "preinstall": "./scripts/cmd-guard.js --preinstall",
+    "preinstall": "node ./scripts/cmd-guard.js --preinstall",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
@@ -12,7 +12,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@expo/metro-runtime": "57.0.16",
+    "@expo/metro-runtime": "~57.0.17",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "12.0.1",
     "@react-native-vector-icons/feather": "13.1.4",
@@ -21,22 +21,23 @@
     "@tanstack/react-query": "5.104.1",
     "date-fns": "4.1.0",
     "dayjs": "1.11.13",
-    "expo": "57.0.25",
+    "expo": "~57.0.31",
+    "expo-asset": "~57.0.20",
     "expo-audio": "~57.0.5",
     "expo-blur": "57.0.3",
     "expo-build-properties": "~57.0.22",
-    "expo-constants": "57.0.19",
+    "expo-constants": "~57.0.22",
     "expo-dev-client": "~57.0.19",
     "expo-font": "57.0.4",
     "expo-haptics": "57.0.3",
     "expo-image": "57.0.5",
     "expo-image-picker": "~57.0.20",
     "expo-linear-gradient": "57.0.2",
-    "expo-linking": "57.0.11",
+    "expo-linking": "~57.0.13",
     "expo-notifications": "~57.0.21",
-    "expo-router": "57.0.23",
+    "expo-router": "~57.0.29",
     "expo-secure-store": "57.0.4",
-    "expo-splash-screen": "57.0.9",
+    "expo-splash-screen": "~57.0.10",
     "expo-status-bar": "57.0.1",
     "expo-symbols": "57.0.3",
     "expo-system-ui": "57.0.4",
@@ -76,5 +77,5 @@
     "shell-quote": "1.9.0"
   },
   "private": true,
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+  "packageManager": "pnpm@11.25.0"
 }

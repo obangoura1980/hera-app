@@ -2,28 +2,18 @@
   "expo": {
     "name": "Hera",
     "slug": "frontend",
-    "version": "1.0.9",
+    "version": "7.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.manifestdreams.qc3zvj",
+      "bundleIdentifier": "com.hera.herapp",
+      "buildNumber": "604",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board",
-        "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera",
-        "UIApplicationSceneManifest": {
-          "UIApplicationSupportsMultipleScenes": false,
-          "UISceneConfigurations": {
-            "UIWindowSceneSessionRoleApplication": [
-              {
-                "UISceneConfigurationName": "Default Configuration",
-                "UISceneDelegateClassName": "EXExpoAppSceneDelegate"
-              }
-            ]
-          }
-        }
+        "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera"
       }
     },
     "android": {
@@ -82,7 +72,14 @@
         }
       ],
       "./plugins/withAndroidBackupRulesFix",
-      "expo-build-properties"
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
