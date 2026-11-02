@@ -55,7 +55,13 @@
           "microphonePermission": "Record audio when capturing videos for your vision board"
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -81,7 +87,13 @@
           }
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "Helps us understand how you discovered Hera"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
