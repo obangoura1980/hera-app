@@ -343,11 +343,11 @@ export default function LoginScreen() {
         setShowRestoreModal(true);
       } else {
         triggerSync('local_only');
-        router.replace(returnTo as any);
+        router.replace('/subscription');
       }
     } catch {
       triggerSync('merge');
-      router.replace(returnTo as any);
+      router.replace('/subscription');
     } finally { setIsCheckingCloud(false); }
   }, [otp, normalizedEmail, verifyOTPAndLogin, showAlert, lockSync, triggerSync, returnTo]);
 
@@ -564,7 +564,7 @@ export default function LoginScreen() {
 
             // Step 4: all clear — apply restore, then navigate
             await triggerSync('restore');
-            try { router.replace(returnTo as any); } catch { }
+            try { router.replace('/subscription'); } catch { }
 
           } catch (e) {
             // Outermost catch: something unexpected — never leave user stranded
@@ -583,7 +583,7 @@ export default function LoginScreen() {
           } catch (e) {
             console.warn('[Login] Start fresh failed:', e);
           } finally {
-            try { router.replace(returnTo as any); } catch { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } }
+            try { router.replace('/subscription'); } catch { try { resetOnboardingProgress(); router.replace('/onboarding'); } catch { } }
           }
         }}
       />

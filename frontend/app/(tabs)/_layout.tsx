@@ -20,8 +20,6 @@ const NAV_ITEMS: {
   { route: 'profile',  iconOff: 'person-outline',  iconOn: 'person' },
 ];
 
-
-
 // ── Floating Capsule Tab Bar ───────────────────────────────────────────────────
 function FloatingTabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -101,16 +99,18 @@ const fn = StyleSheet.create({
 // ── Layout ────────────────────────────────────────────────────────────────────
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <FloatingTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="chat" />
-      <Tabs.Screen name="vision" />
-      <Tabs.Screen name="journal" />
-      <Tabs.Screen name="discover" />
-      <Tabs.Screen name="profile" />
-    </Tabs>
+    <>
+      <Tabs
+        tabBar={(props) => <FloatingTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="chat" />
+        <Tabs.Screen name="vision" />
+        <Tabs.Screen name="journal" />
+        <Tabs.Screen name="discover" />
+        <Tabs.Screen name="profile" />
+      </Tabs>
+    </>
   );
 }

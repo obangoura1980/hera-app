@@ -3,14 +3,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, ActivityIndicator, LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-
-LogBox.ignoreLogs([
-  'Billing is not available in this device',
-  'Error fetching offerings',
-  'PurchaseNotAllowedError',
-  'None of the products registered in the RevenueCat dashboard could be fetched',
-  'There is an issue with your configuration',
-]);
 import { AlertProvider, AuthProvider } from '@/template';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { HeraProvider } from '@/contexts/HeraContext';
@@ -28,6 +20,10 @@ import { initializeRevenueCat, RCSubscriptionProvider } from '@/src/lib/revenuec
 
 // RevenueCat must be configured at module scope, once, before any component mounts.
 const queryClient = new QueryClient();
+// Simulators/emulators and unconfigured stores return no products (e.g.
+// BILLING_UNAVAILABLE / "could not fetch products") — the paywall handles that
+// with a "Continue to App" screen, so keep these SDK logs out of LogBox.
+LogBox.ignoreLogs([/\[RevenueCat\]/, /BILLING_UNAVAILABLE/, /Billing is not available/, /Error fetching offerings/, /PurchaseNotAllowedError/, /None of the products registered/, /There is an issue with your configuration/]);
 try {
   initializeRevenueCat();
 } catch (err) {

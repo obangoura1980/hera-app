@@ -91,3 +91,74 @@
 - Fix: custom config plugin frontend/plugins/withAndroidBackupRulesFix.js adds tools:replace="android:dataExtractionRules,android:fullBackupContent" keeping secure-store rules (NOT preferAppsFlyerBackupRules=true, which would delete them); listed last in app.json plugins
 - Verified locally: expo prebuild --platform android --no-install succeeds; generated AndroidManifest.xml has tools:replace on <application> + secure-store rules retained, XML parses; android/ dir and package.json prebuild side-effects cleaned up
 - PENDING: user redeploy via Emergent Publish to confirm the EAS build completes end-to-end
+
+## Update (2026-10-13) — Permanent demo/reviewer account
+- demo@heraapp.com / HeraDemo2024! — seeded on every backend startup (idempotent upsert, is_premium=true), whitelisted in PREMIUM_BYPASS_EMAILS so full premium access without any purchase
+- Never deletable/resettable: DELETE /api/account and POST /api/account/reset return 403 for it; register with the email returns 409; password works from any location (no OTP dependency)
+- Login screen (app/login.tsx): entering the demo email switches to a "Demo Sign In" password stage (invisible to regular users, OTP flow unchanged); routes into the app with premium active
+- Testing agent iteration 29: 6/6 flows pass (demo detection, login, wrong password, back-to-email, OTP regression, premium access)
+- NOTE: production Atlas DB gets the seed only after the NEXT backend deploy — reviewer credentials go live on redeploy
+
+## Update (2026-10-21) — GitHub repo merge (repo = source of truth, careful merge)
+- Pulled public repo github.com/obangoura1980/hera-app and merged user's changes on top of our work
+- Backend: demo login accepts reviewer passwords (HeraDemo2024!/1234/123456/demo1234/12345678); demo OTP send returns fixed code 1234 (no email, 365-day expiry); demo OTP verify accepts 1234/password; User.public() reflects premium for bypass emails; OtpVerifyIn max_length 8→16. KEPT ours: startup seed, delete/reset 403 protection, /health. Single get_or_create_demo_user helper instead of repo's 3 duplicated blocks
+- Frontend: subscription stack replaced with RevenueCat native paywall — new RevenueCatPaywall.native.tsx (RevenueCatUI.Paywall, offeringId support, purchase/restore callbacks) + web fallback RevenueCatPaywall.tsx (no purchases-ui on web: premium notice + Restore); PaywallModal now thin Modal wrapper; SubscriptionContext showPaywall(feature, offeringId) presents native paywall when PaywallView exists, demo email = subscribed client-side; login.tsx repo demo flow (demo email → OTP stage with Password/Code field, marks hera_onboarded); app.json version 1.0.6 + versionCode 10
+- SKIPPED from repo deliberately: emergent-client.ts fake demo token fallback (would fabricate invalid session; backend handles demo verify for real) — adopted only its OTP-send demo short-circuit; repo frontend/android dir (managed workflow); revenuecat.tsx repo version (older — kept our retry/refetch hardening)
+- Verified: lint clean (frontend+backend), demo login via code 1234 lands on Home with premium, /subscription web fallback renders, 10/10 backend curl checks pass
+- NOTE: native RC paywall UI needs a device build to validate; if no paywall is designed in RC Paywall Editor, the SDK shows its default paywall
+
+## Update (2026-10-21) — App Store identity
+- iOS bundleIdentifier changed to com.hera.herapp (matches user's live App Store app; same as Android package)
+- expo.version 6.0.0 (live App Store version was 5.0.0); iOS buildNumber/Android versionCode managed remotely by EAS
+- User must confirm RevenueCat iOS app (app8070880860) bundle ID = com.hera.herapp
+
+## Update (2026-10-21) — pre-iOS-build hardening
+- Removed mocked POST /api/premium/activate (unused by app; let any signed-in user grant themselves premium). Now 404. Premium only via RevenueCat or PREMIUM_BYPASS_EMAILS
+- Deployment check: iOS config OK (bundle com.hera.herapp, v6.0.0, permission strings present, plugins resolve, compiles)
+- Deliberately NOT changed: .gitignore .env patterns (flagged by deploy agent, but earlier builds received frontend/.env fine and the repo is public — un-ignoring would publish keys)
+
+## Update (2026-10-21) — iOS build missing from App Store Connect
+- Likely cause: expo-image-picker plugin had cameraPermission:false + microphonePermission:false -> NSCameraUsageDescription/NSMicrophoneUsageDescription absent while the linked picker binary references camera APIs -> Apple post-upload processing rejects (ITMS-90683), build never appears in ASC (Apple emails the account holder)
+- Fix: real camera/mic purpose strings + ios.infoPlist ITSAppUsesNonExemptEncryption=false. Verified via expo config introspect: all Usage strings present, bundle com.hera.herapp, version 6.0.0
+- Other possible causes if it recurs: build uploaded under a different Apple team/app record; still processing (up to ~1h); build number already used
+
+## Update (2026-10-21) — demo premium confirm + restore message
+- Demo premium (already in place, re-verified): DB is_premium=true (seed + get_or_create_demo_user re-asserts), PREMIUM_BYPASS_EMAILS (GET /api/subscription subscribed:true, /auth/me is_premium:true), frontend isDemoEmail -> isSubscribed
+- Restore messages: SubscriptionContext restore catch no longer shows raw store SDK text (could mention 'Apple ID'); shows 'No Active Subscription' / 'No active subscription was found for this account.' Native RevenueCat paywall: onRestoreCompleted without entitlement + onRestoreError now show the same message. RevenueCatUI's own native dialogs (if any) are not app-controllable
+
+## Update (2026-10-21) — Paywall 'not available' + onboarding->paywall loop fix
+- Root cause: repo's thin subscription.tsx rendered only RevenueCatUI.Paywall. When StoreKit returns no products (TestFlight: products not fetchable), RevenueCatUI shows dead-end 'Paywall is not available'; its Close -> router.back()/replace('/(tabs)') -> (tabs) SubscriptionGuard replace('/subscription') -> remount -> loop. Repo version had also dropped AuthGate + local plan steps + refetchOfferings
+- Fix: restored our full subscription.tsx (AuthGate -> TrialSummary -> Checkout, retry). Native RevenueCatPaywall used ONLY when PaywallView exists AND target offering has packages; native onDismiss/onLoadError -> local paywall (no navigation -> no loop)
+- RevenueCatPaywall.native: calls onLoadError on fetch error or empty offering. PaywallModal: onLoadError -> onViewPlans (opens local /subscription). SubscriptionContext.showPaywall: skips presentPaywall when offering has no packages. Re-added refetchOfferings + purchasePlan live-refetch to SubscriptionContext (repo version dropped them)
+- index.tsx waits for statusLoaded (onboarded users) before redirecting, so subscribers don't flash through /subscription
+- Testing agent iteration 30: 6/6 flows pass (onboarding -> /subscription once, stable 12s; hera_onboarded persisted; local paywall + Tap-to-retry; no loop; demo stays on Home; no max-update-depth). Added 6s timeout fallback in index.tsx so a hung status check never leaves a blank screen
+
+## Update (2026-10-21) — paywall prices matched
+- subscription.tsx fallback prices now $12.99/mo, $89.99/yr ($7.50/mo); savings labels 30% -> 42% (89.99 vs 12.99x12=155.88)
+- OPEN: onboarding.tsx PLANS shows a 'Founding Member $7.99/month' option with no matching store product — awaiting user decision
+- Removed 'Founding Member $7.99/month' from onboarding PLANS (no store product); selectedPlan type now 'annual'|'premium'. selectedPlan is display-only (purchase happens on /subscription)
+
+## Update (2026-10-21) — Dynamic RevenueCat paywall (soft paywall)
+- User decisions: keep iOS bundle com.hera.herapp (request said qc3zvj — rejected, live app is herapp); closing paywall / 'Continue to App' lets users in FREE; keep email sign-in before paywall
+- subscription.tsx rewritten: AuthGate -> PaywallStage. PaywallStage: loader while offerings load; RevenueCatUI.Paywall (offering 'default', remote template pw9af6c733f8134615 attached in RC dashboard — SDK has no template-id prop) only when native PaywallView + packages; else clean 'Plans are unavailable right now' with Continue to App / Try again / Restore. Removed hardcoded TrialSummary/Checkout steps + static prices
+- Purchase/restore with active 'pro' -> /(tabs); dismiss -> /(tabs). customerInfo listener already in revenuecat.tsx (addCustomerInfoUpdateListener)
+- Removed (tabs) SubscriptionGuard; index.tsx onboarded -> /(tabs) always. Premium gating now only via in-feature prompts (chat limit showPaywall)
+- LogBox.ignoreLogs for RevenueCat/BILLING_UNAVAILABLE/no-products messages (root _layout)
+- Trial length (30 days per request) is configured store-side; paywall shows whatever stores return
+- Iteration 31: 10/10 pass. Follow-ups applied: Try again min 900ms spinner; offerings empty-poll capped at 5 refetches; fallback copy 'couldn't load subscription plans'; unused imports removed (tsc clean for subscription.tsx). OPEN (not fixed): onboarding.tsx still contains legacy hardcoded plan screen 25 (unreachable in normal flow); circular import SubscriptionContext->PaywallModal->RevenueCatPaywall->useSubscription (warning only)
+
+## 2026-10-21 — 'remote paywall not showing' diagnosis
+- Offering 'default' has paywall attached for test/ios/android keys. iOS + Android keys return both packages; Test Store key returns packages: [] 
+- react-native-purchases-ui 10.11.0 uses Preview API Mode on web + Expo Go (shouldUsePreviewAPIMode): <Paywall/> renders a fake 'Preview Paywall — Web paywalls are not supported yet'. Remote template can ONLY render in native dev/production builds. User's screenshot = web/Expo Go fallback (expected)
+- On TestFlight the paywall still needs StoreKit to return products (earlier error 'None of the products could be fetched') -> App Store Connect checks pending
+- Did NOT add REVENUECAT_SECRET_API_KEY to frontend .env (secret must never ship in the app bundle; app doesn't need it)
+
+## Update (2026-10-27) — GitHub merge #2 (repo commits 3947b85..7c90db6)
+- TAKEN: onboarding.tsx (screen 25 now RevenueCatPaywall, removed legacy hardcoded plan screen + PLANS), revenuecat.tsx (ensureRevenueCat, isConfigured guard, setLogHandler demoting store-unavailable logs, native always uses real appl_/goog_ keys incl. dev builds), SubscriptionContext AppState foreground re-check, login returnTo default '/(tabs)', LogBox strings, app.json UIApplicationSceneManifest + expo-build-properties plugin (yarn expo install expo-build-properties@~57.0.22)
+- KEPT OURS: subscription.tsx (AuthGate + PaywallStage fallback), RevenueCatPaywall.native/.tsx split with onLoadError, showPaywall empty-offering guard, PaywallModal offeringId, bundle com.hera.herapp, version 6.0.0, ITSAppUsesNonExemptEncryption, camera/mic strings
+- RE-APPLIED on repo revenuecat.tsx: offerings retry/backoff + capped empty poll, refetchOfferings export; FIXED repo listener leak (cleanup returned inside .then never ran)
+- NOT COPIED: repo frontend/ios + frontend/android prebuilt native dirs (ios pbxproj has PRODUCT_BUNDLE_IDENTIFIER qc3zvj + version 1.0.7; presence would make EAS ignore app.json), package-lock.json (yarn project), unboundKey.jks (keystore — should not be in a public repo)
+- 2026-10-27: Re-checked GitHub (still commit 7c90db6, no new commits). Adopted repo Android versionCode 13. Kept: version 6.0.0, bundle com.hera.herapp, demo account protections, removed /premium/activate, RevenueCat remote paywall code.
+- 2026-10-29: Merged GitHub commit fb62320 'Fix iOS TestFlight launch crash': version 7.0.0, iOS buildNumber 604, removed manual UIApplicationSceneManifest, expo-build-properties ios.enableSceneSupport=true, Expo SDK patch bumps (expo 57.0.31, router 57.0.29, etc.) + expo-asset via yarn. Did NOT adopt pnpm switch or deletion-only ios/ folder changes (no ios/ folder here).
+- 2026-11-02: Added App Tracking Transparency (expo-tracking-transparency). iOS asks ATT in initAppsFlyer() before appsFlyer.initSdk (only when undetermined). expo-audio plugin enableBackgroundPlayback=false → no 'audio' in UIBackgroundModes (verified via expo config introspect).
+- 2026-11-08: Verified user's Android upload keystore (PKCS12, alias upload, RSA-2048, valid to 2049, SHA-1 4D:18:2A...). Signing is managed by Emergent/EAS — no custom keystore field; user must email support@emergent.sh. Added *.jks/*.keystore to root .gitignore. Keystore was also committed to public GitHub repo → recommend Play upload-key reset. Android: package com.hera.herapp, versionCode 13, minSdk 24 / target+compile 36, AGP 8.12, Kotlin 2.1.20 (SDK 57 defaults).

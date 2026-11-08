@@ -10,11 +10,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hera.herapp",
-      "buildNumber": "604",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Choose photos for your profile and vision board",
-        "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera"
-      }
+        "NSUserTrackingUsageDescription": "Helps us understand how you discovered Hera",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "604"
     },
     "android": {
       "adaptiveIcon": {
@@ -50,11 +51,17 @@
         "expo-image-picker",
         {
           "photosPermission": "Choose photos for your profile and vision board",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "cameraPermission": "Take photos for your profile and vision board",
+          "microphonePermission": "Record audio when capturing videos for your vision board"
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -78,6 +85,13 @@
           "ios": {
             "enableSceneSupport": true
           }
+        }
+      ],
+      "expo-asset",
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "Helps us understand how you discovered Hera"
         }
       ]
     ],

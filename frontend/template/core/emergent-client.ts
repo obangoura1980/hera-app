@@ -40,7 +40,7 @@ const fail = (message: string) => ({ data: null, error: { message } });
 // Chainable no-op query builder (cloud sync tables are not used; data stays on device).
 function queryBuilder(): any {
   const result = Promise.resolve(ok([]));
-  const proxy: any = new Proxy(function () { }, {
+  const proxy: any = new Proxy(function () {}, {
     get: (_t, prop) => {
       if (prop === "then") return result.then.bind(result);
       if (prop === "catch") return result.catch.bind(result);
@@ -61,36 +61,18 @@ const client = {
       return { data: { subscription: { unsubscribe: () => listeners.delete(cb) } } };
     },
     signInWithOtp: async ({ email, options }: { email: string; options?: { shouldCreateUser?: boolean } }) => {
+      // Reviewer demo account — backend issues a fixed code; skip the send call
+      if (email.toLowerCase() === "demo@heraapp.com") return ok({});
       try {
         await api("/auth/otp/send", { method: "POST", body: { email, should_create_user: options?.shouldCreateUser ?? true } });
         return ok({});
       } catch (e: any) {
-        if (email.toLowerCase() === "demo@heraapp.com") return ok({});
         return fail(e.message);
       }
     },
     verifyOtp: async ({ email, token }: { email: string; token: string }) => {
       try {
-        let r: any;
-        try {
-          r = await api("/auth/otp/verify", { method: "POST", body: { email, code: token } });
-        } catch (apiErr: any) {
-          if (email.toLowerCase() === "demo@heraapp.com" && (token === "HeraDemo2024!" || token === "1234" || token === "123456")) {
-            r = {
-              access_token: "demo_token_playstore_review",
-              user: {
-                id: "demo_user_id",
-                email: "demo@heraapp.com",
-                name: "Demo User",
-                is_premium: true,
-                created_at: new Date().toISOString()
-              },
-              is_new: false
-            };
-          } else {
-            throw apiErr;
-          }
-        }
+        const r: any = await api("/auth/otp/verify", { method: "POST", body: { email, code: token } });
         await setSession(r.access_token, r.user);
         // Analytics: first-time OTP verify = registration, otherwise login.
         // Fire-and-forget — analytics must never break auth.

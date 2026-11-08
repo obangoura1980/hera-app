@@ -5,6 +5,7 @@ import { RevenueCatPaywall } from '@/components/feature/RevenueCatPaywall';
 interface PaywallModalProps {
   visible: boolean;
   feature?: string;
+  offeringId?: string;
   chatCount?: number;
   chatLimit?: number;
   onClose: () => void;
@@ -14,7 +15,9 @@ interface PaywallModalProps {
 
 export function PaywallModal({
   visible,
+  offeringId = 'default',
   onClose,
+  onViewPlans,
 }: PaywallModalProps) {
   return (
     <Modal
@@ -25,8 +28,10 @@ export function PaywallModal({
       onRequestClose={onClose}
     >
       <RevenueCatPaywall
+        offeringId={offeringId}
         onDismiss={onClose}
         onPurchaseSuccess={onClose}
+        onLoadError={onViewPlans ?? onClose}
       />
     </Modal>
   );

@@ -11,6 +11,10 @@
  */
 import appsFlyer from 'react-native-appsflyer';
 import { Platform } from 'react-native';
+import {
+  getTrackingPermissionsAsync,
+  requestTrackingPermissionsAsync,
+} from 'expo-tracking-transparency';
 
 const DEV_KEY = process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY ?? '';
 const IOS_APP_ID = process.env.EXPO_PUBLIC_APPSFLYER_IOS_APP_ID;
@@ -25,6 +29,17 @@ export function initAppsFlyer(): Promise<void> {
     if (!DEV_KEY) {
       if (__DEV__) console.warn('[AppsFlyer] dev key missing — analytics disabled');
       return;
+    }
+    // iOS: ask App Tracking Transparency permission BEFORE the SDK starts tracking.
+    if (Platform.OS === 'ios') {
+      try {
+        const current = await getTrackingPermissionsAsync();
+        if (current.status === 'undetermined' && current.canAskAgain) {
+          await requestTrackingPermissionsAsync();
+        }
+      } catch (error) {
+        if (__DEV__) console.warn('[ATT] permission request failed', error);
+      }
     }
     await appsFlyer.initSdk({
       devKey: DEV_KEY,

@@ -7,24 +7,29 @@ import { useSubscription } from '@/hooks/useSubscription';
 
 export default function Index() {
   const { user: authUser, loading: authLoading } = useAuth();
-  const { isSubscribed, isTrial, isLoading: subLoading } = useSubscription();
+  const { isSubscribed, isTrial, isLoading: subLoading, statusLoaded } = useSubscription();
   const [ready, setReady] = useState(false);
   const [onboarded, setOnboarded] = useState(false);
+  const [statusTimedOut, setStatusTimedOut] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('hera_onboarded')
       .then(v => { setOnboarded(v === 'true'); setReady(true); })
       .catch(() => setReady(true));
+    // Never leave the user on a blank screen if the subscription check hangs
+    const t = setTimeout(() => setStatusTimedOut(true), 6000);
+    return () => clearTimeout(t);
   }, []);
 
   // Wait for onboarding check, auth, and subscription to resolve
-  if (!ready || authLoading || subLoading) {
+  if (!ready || ((authLoading || subLoading || (onboarded && !statusLoaded)) && !statusTimedOut)) {
     return <View style={{ flex: 1, backgroundColor: '#080A18' }} />;
   }
 
   // New user — send to onboarding
   if (!onboarded) return <Redirect href="/onboarding" />;
 
-  // Onboarded user — go to main app
+  // Onboarded — the paywall was shown once at the end of onboarding; free users
+  // get the app with premium features gated by their own upgrade prompts.
   return <Redirect href="/(tabs)" />;
 }

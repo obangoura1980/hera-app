@@ -12,9 +12,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 const REVENUECAT_TEST_API_KEY =
   process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY || "test_DVTXvbpqNHTxfpwfxYwOVtIgyNc";
 const REVENUECAT_IOS_API_KEY =
-  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || "appl_nRHvPjOiMewtpDZxFfXIoTHznjo";
+  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || "appl_OOwuZVkDjZgAvWfzbMvYOiDPLTH";
 const REVENUECAT_ANDROID_API_KEY =
-  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || "goog_CNkLLDrwBXistuBcTZgizldcrwG";
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || "goog_EHrJSVHgTSOkfTYeqRJbRZNPWrR";
 
 export const REVENUECAT_ENTITLEMENT_IDENTIFIER = "pro"; // from setup: entitlement_lookup_key
 
@@ -129,25 +129,35 @@ function useSubscriptionContext() {
     },
     enabled: rcEnabled,
     staleTime: 300 * 1000,
+    // Store product catalogs can lag on cold start — retry with backoff
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    // getOfferings() can RESOLVE with an empty package list — poll gently (max ~5 times)
+    refetchInterval: (query) => {
+      const pkgs = query.state.data?.current?.availablePackages ?? [];
+      return pkgs.length === 0 && query.state.dataUpdateCount < 5 ? 15000 : false;
+    },
   });
 
   // Reactive entitlement updates — the SDK pushes fresh CustomerInfo after
   // purchases, restores, renewals, and logIn/logOut. Never poll for this.
   useEffect(() => {
     if (!rcEnabled) return;
+    let cancelled = false;
+    const listener = (info: CustomerInfo) =>
+      queryClient.setQueryData(["revenuecat", "customer-info"], info);
     ensureRevenueCat().then((ok) => {
-      if (!ok) return;
+      if (!ok || cancelled) return;
       try {
-        const listener = (info: CustomerInfo) =>
-          queryClient.setQueryData(["revenuecat", "customer-info"], info);
         Purchases.addCustomerInfoUpdateListener(listener);
-        return () => {
-          Purchases.removeCustomerInfoUpdateListener(listener);
-        };
       } catch (err) {
         console.warn("[RevenueCat] CustomerInfoUpdateListener error:", err);
       }
     });
+    return () => {
+      cancelled = true;
+      try { Purchases.removeCustomerInfoUpdateListener(listener); } catch {}
+    };
   }, [queryClient]);
 
   const purchaseMutation = useMutation({
@@ -187,6 +197,7 @@ function useSubscriptionContext() {
     isPurchasing: purchaseMutation.isPending,
     isRestoring: restoreMutation.isPending,
     refetchCustomerInfo: customerInfoQuery.refetch,
+    refetchOfferings: offeringsQuery.refetch,
   };
 }
 
