@@ -1,22 +1,47 @@
 {
-  "summary": "REGRESSION TEST (frontend-only, mobile 390x844, public preview) of the paywall offerings fix. CRITICAL — USER BUG REPRODUCED: the paywall again shows 'Subscription options are unavailable right now / Tap to retry'. ROOT CAUSE confirmed at the RevenueCat API level: GET https://api.revenuecat.com/v1/subscribers/<id>/offerings (Bearer test_DVTXvbpqNHTxfpwfxYwOVtIgyNc) returns 200 with current_offering_id 'default' but packages: [] — ZERO packages attached to the offering. The products re-provisioning did NOT attach packages to the current offering (or wrote them to a different project). The app code behaves as designed (empty-state + Tap to retry). STRONG LEAD: frontend/.env now has NEW native keys (appl_nRHvPjOiMewtpDZxFfXIoTHznjo / goog_CNkLLDrwBXistuBcTZgizldcrwG) from the user's new RC apps, but the SAME OLD Test Store key (test_DVTXvbpqNHTxfpwfxYwOVtIgyNc) — if products/offerings were provisioned in the NEW project, the web preview is still reading offerings from the OLD project; the test key likely needs rotating to the new project's test key. ALSO: the price upsert STILL never applied even on the old project (pro.monthly=999, pro.annual=7999 micros, trial:null — 3rd iteration observing this). WHAT PASSED: auth-gate OTP sign-in (fresh account auto-register + RC identity bind) PASS; Restore Purchases on fresh account shows 'No Active Subscription' with no error PASS; 'Tap to retry' is tappable and refetches PASS (but offerings stay empty). BLOCKED (same root cause): plan prices from store, monthly purchase, post-purchase entitlement/tabs, sign-out/sign-in offerings regression. CODE-HARDENING GAP: react-query retry:3 in revenuecat.tsx never fires for this failure mode because getOfferings() RESOLVES (HTTP 200, empty packages) — retry only triggers on rejected promises; only manual 'Tap to retry' recovers.",
+  "summary": "REGRESSION TEST (frontend-only, mobile 390x844, public preview) of the paywall offerings fix. CRITICAL — USER BUG REPRODUCED: the paywall again shows 'Subscription options are unavailable right now / Tap to retry'. ROOT CAUSE confirmed at the RevenueCat API level: GET https://api.revenuecat.com/v1/subscribers/<id>/offerings (Bearer test_DVTXvbpqNHTxfpwfxYwOVtIgyNc) returns 200 with current_offering_id 'default' but packages: [] — ZERO packages attached to the offering. The products re-provisioning did NOT attach packages to the current offering (or wrote them to a different project). The app code behaves as designed (empty-state + Tap to retry). STRONG LEAD: frontend/.env now has NEW native keys (appl_OOwuZVkDjZgAvWfzbMvYOidPLTH / goog_EHrJSVHgTSOkfTYeqRJbRZNPWrR) from the user's new RC apps, but the SAME OLD Test Store key (test_DVTXvbpqNHTxfpwfxYwOVtIgyNc) — if products/offerings were provisioned in the NEW project, the web preview is still reading offerings from the OLD project; the test key likely needs rotating to the new project's test key. ALSO: the price upsert STILL never applied even on the old project (pro.monthly=999, pro.annual=7999 micros, trial:null — 3rd iteration observing this). WHAT PASSED: auth-gate OTP sign-in (fresh account auto-register + RC identity bind) PASS; Restore Purchases on fresh account shows 'No Active Subscription' with no error PASS; 'Tap to retry' is tappable and refetches PASS (but offerings stay empty). BLOCKED (same root cause): plan prices from store, monthly purchase, post-purchase entitlement/tabs, sign-out/sign-in offerings regression. CODE-HARDENING GAP: react-query retry:3 in revenuecat.tsx never fires for this failure mode because getOfferings() RESOLVES (HTTP 200, empty packages) — retry only triggers on rejected promises; only manual 'Tap to retry' recovers.",
   "backend_issues": {
     "critical": [],
     "minor": []
   },
   "frontend_issues": {
     "ui_bugs": [
-      {"component": "Paywall plan step (TrialSummaryStep)", "issue": "Shows fallback prices ($83.88/yr, $9.99/mo) + 'Subscription options are unavailable right now / Tap to retry' because offerings.current.availablePackages is empty. App code is correct; the RC offering served to the Test Store key has packages:[]. Verify: curl -H 'Authorization: Bearer test_DVTXvbpqNHTxfpwfxYwOVtIgyNc' 'https://api.revenuecat.com/v1/subscribers/%24RCAnonymousID%3Ax/offerings'. Reference: /app/frontend/app/subscription.tsx:221-242.", "testID": "", "priority": "CRITICAL (root cause is RC dashboard config, not app code)"},
-      {"component": "Offerings query hardening (revenuecat.tsx)", "issue": "retry:3/retryDelay only retries REJECTED queries. getOfferings() resolves with empty packages, so the advertised 'retries 3x with backoff' never engages for the empty-catalog failure mode. Consider refetch-on-empty logic (e.g., useEffect timer while availablePackages.length===0, max N attempts) if cold-start robustness was the goal. Reference: /app/frontend/src/lib/revenuecat.tsx:68-77.", "testID": "", "priority": "MEDIUM"}
+      {
+        "component": "Paywall plan step (TrialSummaryStep)",
+        "issue": "Shows fallback prices ($83.88/yr, $9.99/mo) + 'Subscription options are unavailable right now / Tap to retry' because offerings.current.availablePackages is empty. App code is correct; the RC offering served to the Test Store key has packages:[]. Verify: curl -H 'Authorization: Bearer test_DVTXvbpqNHTxfpwfxYwOVtIgyNc' 'https://api.revenuecat.com/v1/subscribers/%24RCAnonymousID%3Ax/offerings'. Reference: /app/frontend/app/subscription.tsx:221-242.",
+        "testID": "",
+        "priority": "CRITICAL (root cause is RC dashboard config, not app code)"
+      },
+      {
+        "component": "Offerings query hardening (revenuecat.tsx)",
+        "issue": "retry:3/retryDelay only retries REJECTED queries. getOfferings() resolves with empty packages, so the advertised 'retries 3x with backoff' never engages for the empty-catalog failure mode. Consider refetch-on-empty logic (e.g., useEffect timer while availablePackages.length===0, max N attempts) if cold-start robustness was the goal. Reference: /app/frontend/src/lib/revenuecat.tsx:68-77.",
+        "testID": "",
+        "priority": "MEDIUM"
+      }
     ],
     "integration_issues": [
-      {"flow": "RevenueCat Test Store offerings", "issue": "BLOCKER: offering 'default' has packages:[] for test key test_DVTXvbpqNHTxfpwfxYwOVtIgyNc. Products exist (pro.monthly $9.99, pro.annual $79.99, trial:null) but are not attached to the offering as packages. Purchase flow impossible until packages ($rc_monthly/$rc_annual) are attached to the current offering in whichever project this test key belongs to.", "affected_testIDs": []},
-      {"flow": "RC key/project consistency", "issue": "New appl_/goog_ keys in frontend/.env (user's NEW RC apps) but the SAME test_DVTX... test key as before the user's dashboard changes. If a new RC project was created, it has its own Test Store key — the preview may be reading the old project's (now broken) offering. Action: either rotate EXPO_PUBLIC_REVENUECAT_TEST_API_KEY to the new project's test key, or re-attach packages to the old project's default offering.", "affected_testIDs": []},
-      {"flow": "Test Store pricing", "issue": "STILL $9.99/$79.99, trial:null (rcbilling /products API) — the claimed $12.99/$89.99 + P1W trial upsert has not applied for the 3rd consecutive iteration. If provisioning ran against a new project, that explains it; verify against the correct project/key.", "affected_testIDs": []}
+      {
+        "flow": "RevenueCat Test Store offerings",
+        "issue": "BLOCKER: offering 'default' has packages:[] for test key test_DVTXvbpqNHTxfpwfxYwOVtIgyNc. Products exist (pro.monthly $9.99, pro.annual $79.99, trial:null) but are not attached to the offering as packages. Purchase flow impossible until packages ($rc_monthly/$rc_annual) are attached to the current offering in whichever project this test key belongs to.",
+        "affected_testIDs": []
+      },
+      {
+        "flow": "RC key/project consistency",
+        "issue": "New appl_/goog_ keys in frontend/.env (user's NEW RC apps) but the SAME test_DVTX... test key as before the user's dashboard changes. If a new RC project was created, it has its own Test Store key — the preview may be reading the old project's (now broken) offering. Action: either rotate EXPO_PUBLIC_REVENUECAT_TEST_API_KEY to the new project's test key, or re-attach packages to the old project's default offering.",
+        "affected_testIDs": []
+      },
+      {
+        "flow": "Test Store pricing",
+        "issue": "STILL $9.99/$79.99, trial:null (rcbilling /products API) — the claimed $12.99/$89.99 + P1W trial upsert has not applied for the 3rd consecutive iteration. If provisioning ran against a new project, that explains it; verify against the correct project/key.",
+        "affected_testIDs": []
+      }
     ],
     "design_issues": [],
     "react_native_issues": [
-      {"component": "testID coverage", "issue": "Paywall CTAs, OTP inputs, Restore Purchases, Tap-to-retry still lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx."}
+      {
+        "component": "testID coverage",
+        "issue": "Paywall CTAs, OTP inputs, Restore Purchases, Tap-to-retry still lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx."
+      }
     ]
   },
   "test_report_links": [
@@ -40,7 +65,10 @@
     "No deprecated expo-av / expo-barcode-scanner / expo-background-fetch usage observed in the RevenueCat-touched files."
   ],
   "updated_files": [],
-  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "50% — PASS: auth-gate sign-in, restore-no-error, tap-to-retry tappable, empty-state UX. BLOCKED/FAIL: offerings load with prices (FAIL — empty offering), monthly purchase (BLOCKED), entitlement+nav (BLOCKED), sign-out/sign-in offerings regression (BLOCKED, same root cause)"},
+  "success_rate": {
+    "backend": "n/a (frontend-only)",
+    "frontend": "50% — PASS: auth-gate sign-in, restore-no-error, tap-to-retry tappable, empty-state UX. BLOCKED/FAIL: offerings load with prices (FAIL — empty offering), monthly purchase (BLOCKED), entitlement+nav (BLOCKED), sign-out/sign-in offerings regression (BLOCKED, same root cause)"
+  },
   "seed_data_creation": "Fresh OTP-override accounts (code 1234, /app/scripts/otp_override.py): test_rc3_buyer_1791922607@resend.dev, test_rc3_restore_1791922701@resend.dev (no purchases — purchase blocked by empty offering). delivered@resend.dev and owner account untouched.",
   "retest_needed": true,
   "should_main_agent_self_test": true,

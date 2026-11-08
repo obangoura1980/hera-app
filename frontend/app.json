@@ -23,7 +23,7 @@
         "backgroundColor": "#1E0A3C"
       },
       "package": "com.hera.herapp",
-      "versionCode": 13
+      "versionCode": 14
     },
     "web": {
       "bundler": "metro",

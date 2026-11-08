@@ -128,13 +128,15 @@ export function RevenueCatPaywall({
     );
   }
 
-  if (loadError) {
+  if (loadError || !selectedOffering?.availablePackages?.length) {
     return (
       <View style={st.centered}>
-        <Text style={st.errorTitle}>Paywall Unavailable</Text>
-        <Text style={st.errorText}>{loadError}</Text>
+        <Text style={st.errorTitle}>Plans Unavailable</Text>
+        <Text style={st.errorText}>
+          {loadError || 'Subscription plans are currently unavailable on this device. You can keep using Hera and upgrade anytime.'}
+        </Text>
         <Pressable style={st.retryBtn} onPress={handleDismiss}>
-          <Text style={st.retryBtnText}>Close</Text>
+          <Text style={st.retryBtnText}>Continue to App</Text>
         </Pressable>
       </View>
     );

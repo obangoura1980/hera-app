@@ -12,9 +12,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 const REVENUECAT_TEST_API_KEY =
   process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY || "test_DVTXvbpqNHTxfpwfxYwOVtIgyNc";
 const REVENUECAT_IOS_API_KEY =
-  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || "appl_OOwuZVkDjZgAvWfzbMvYOiDPLTH";
+  process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY || "appl_nRHvPjOiMewtpDZxFfXIoTHznjo";
 const REVENUECAT_ANDROID_API_KEY =
-  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || "goog_EHrJSVHgTSOkfTYeqRJbRZNPWrR";
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY || "goog_CNkLLDrwBXistuBcTZgizldcrwG";
 
 export const REVENUECAT_ENTITLEMENT_IDENTIFIER = "pro"; // from setup: entitlement_lookup_key
 
@@ -156,7 +156,7 @@ function useSubscriptionContext() {
     });
     return () => {
       cancelled = true;
-      try { Purchases.removeCustomerInfoUpdateListener(listener); } catch {}
+      try { Purchases.removeCustomerInfoUpdateListener(listener); } catch { }
     };
   }, [queryClient]);
 

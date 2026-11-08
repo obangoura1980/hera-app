@@ -6,17 +6,41 @@
   },
   "frontend_issues": {
     "ui_bugs": [
-      {"component": "revenuecat.tsx purchase choke-point + SubscriptionContext identity check", "issue": "CRITICAL: purchases impossible. customerInfo.originalAppUserId stays '$RCAnonymousID:...' after successful logIn/identify (verified via network: POST /v1/subscribers/identify 201, alias created, original_app_user_id unchanged). Checks at revenuecat.tsx:70-71 (throws identity_not_ready) and :85 (identityReady=false) therefore block every purchase with the 'Almost Ready — Preparing secure checkout' alert. Reference: /app/frontend/src/lib/revenuecat.tsx:70-71,85; /app/frontend/contexts/SubscriptionContext.tsx:87-90.", "testID": "", "priority": "CRITICAL"},
-      {"component": "Settings plan card for bypass accounts", "issue": "Owner (server bypass, no RC entitlement) shows plan 'Hera Annual' because plan derivation defaults to 'yearly' when isSubscribed but no entitlement matches a package. Reference: /app/frontend/contexts/SubscriptionContext.tsx:127-133.", "testID": "", "priority": "LOW"}
+      {
+        "component": "revenuecat.tsx purchase choke-point + SubscriptionContext identity check",
+        "issue": "CRITICAL: purchases impossible. customerInfo.originalAppUserId stays '$RCAnonymousID:...' after successful logIn/identify (verified via network: POST /v1/subscribers/identify 201, alias created, original_app_user_id unchanged). Checks at revenuecat.tsx:70-71 (throws identity_not_ready) and :85 (identityReady=false) therefore block every purchase with the 'Almost Ready — Preparing secure checkout' alert. Reference: /app/frontend/src/lib/revenuecat.tsx:70-71,85; /app/frontend/contexts/SubscriptionContext.tsx:87-90.",
+        "testID": "",
+        "priority": "CRITICAL"
+      },
+      {
+        "component": "Settings plan card for bypass accounts",
+        "issue": "Owner (server bypass, no RC entitlement) shows plan 'Hera Annual' because plan derivation defaults to 'yearly' when isSubscribed but no entitlement matches a package. Reference: /app/frontend/contexts/SubscriptionContext.tsx:127-133.",
+        "testID": "",
+        "priority": "LOW"
+      }
     ],
     "integration_issues": [
-      {"flow": "Paywall purchase (Confirm Free Trial)", "issue": "Purchase never reaches the purchases-js Test Store modal — blocked client-side by identity_not_ready choke point (see ui_bugs). Full CustomerInfo after identify: entitlements={}, original_app_user_id=$RCAnonymousID:dff235bb..., alias to backend uid created server-side.", "affected_testIDs": []},
-      {"flow": "Paywall pricing", "issue": "Test Store products are priced $9.99/mo and $79.99/yr in the RC dashboard, but /app/memory/revenuecat.md and the review request state $12.99/mo and $89.99/yr. UI correctly renders the RC prices; the memory/setup expectation is stale or the dashboard config drifted. Also subscription.tsx FALLBACK_* constants ($9.99/$83.88) still render a fake-enabled CTA if offerings were empty — purchasePlan does guard with an 'Unavailable' alert, but the screen never shows an 'unavailable' empty state as required.", "affected_testIDs": []}
+      {
+        "flow": "Paywall purchase (Confirm Free Trial)",
+        "issue": "Purchase never reaches the purchases-js Test Store modal — blocked client-side by identity_not_ready choke point (see ui_bugs). Full CustomerInfo after identify: entitlements={}, original_app_user_id=$RCAnonymousID:dff235bb..., alias to backend uid created server-side.",
+        "affected_testIDs": []
+      },
+      {
+        "flow": "Paywall pricing",
+        "issue": "Test Store products are priced $9.99/mo and $79.99/yr in the RC dashboard, but /app/memory/revenuecat.md and the review request state $12.99/mo and $89.99/yr. UI correctly renders the RC prices; the memory/setup expectation is stale or the dashboard config drifted. Also subscription.tsx FALLBACK_* constants ($9.99/$83.88) still render a fake-enabled CTA if offerings were empty — purchasePlan does guard with an 'Unavailable' alert, but the screen never shows an 'unavailable' empty state as required.",
+        "affected_testIDs": []
+      }
     ],
     "design_issues": [],
     "react_native_issues": [
-      {"component": "testID coverage", "issue": "Paywall CTAs (Start Free Trial, Confirm Free Trial, Restore Purchases, Continue with Email, Verify & Continue, Sign out) lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx, /app/frontend/app/(tabs)/profile.tsx."},
-      {"component": "react-native-purchases-ui", "issue": "Declared in package.json but the paywall is custom-built (components/feature/PaywallModal); unused dependency adds bundle weight. Reference: /app/frontend/package.json:49."}
+      {
+        "component": "testID coverage",
+        "issue": "Paywall CTAs (Start Free Trial, Confirm Free Trial, Restore Purchases, Continue with Email, Verify & Continue, Sign out) lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx, /app/frontend/app/(tabs)/profile.tsx."
+      },
+      {
+        "component": "react-native-purchases-ui",
+        "issue": "Declared in package.json but the paywall is custom-built (components/feature/PaywallModal); unused dependency adds bundle weight. Reference: /app/frontend/package.json:49."
+      }
     ]
   },
   "test_report_links": [
@@ -48,8 +72,13 @@
     "Owner bypass correctly layered: GET /api/subscription checks user.is_premium OR email in PREMIUM_BYPASS_EMAILS (server.py:808-815); pytest verified true/false/401.",
     "No deprecated expo-av / expo-barcode-scanner / expo-background-fetch usage in the RevenueCat-touched files."
   ],
-  "updated_files": ["/app/backend/tests/test_owner_bypass.py"],
-  "success_rate": {"backend": "100% (3/3 pytest)", "frontend": "67% (4/6 flows pass; purchase flow blocked CRITICAL; cold-reload persistence untestable until purchase works)"},
+  "updated_files": [
+    "/app/backend/tests/test_owner_bypass.py"
+  ],
+  "success_rate": {
+    "backend": "100% (3/3 pytest)",
+    "frontend": "67% (4/6 flows pass; purchase flow blocked CRITICAL; cold-reload persistence untestable until purchase works)"
+  },
   "seed_data_creation": "Created non-premium test accounts via OTP override (code 1234): test_rc_buyer_1791137381@resend.dev, test_rc_ui_*, test_rc_ui2_*, test_rc_ui3_*, test_rc_g3_*@resend.dev — none have purchases. delivered@resend.dev untouched. db.otp_log cleared multiple times to bypass 429 rate limits.",
   "retest_needed": true,
   "should_main_agent_self_test": false,

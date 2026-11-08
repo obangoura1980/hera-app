@@ -6,19 +6,53 @@
   },
   "frontend_issues": {
     "ui_bugs": [
-      {"component": "Post-purchase navigation (SubscriptionContext.purchasePlan / subscription.tsx isSubscribed effect)", "issue": "After 'Test valid purchase' and dismissing the Welcome alert, the user SEES tabs Home (tab bar + home content rendered) but the browser address bar stays at /subscription — router.replace('/(tabs)') renders the tabs without updating the web URL. Functional outcome correct; URL stale until next navigation/reload. Web-preview-only cosmetic quirk; cold reload lands on tabs correctly. Reference: /app/frontend/contexts/SubscriptionContext.tsx:191-193, /app/frontend/app/subscription.tsx:703-708.", "testID": "", "priority": "LOW"},
-      {"component": "Onboarding paywall hardcoded PLANS", "issue": "Onboarding screen 25 shows hardcoded prices $89.99/yr, $12.99/mo, $7.99 'Founding Member' (PLANS const) which do NOT match the actual store checkout ($79.99/$9.99, no founding SKU). Users see different prices on the two paywalls. Reference: /app/frontend/app/onboarding.tsx:614-618.", "testID": "", "priority": "MEDIUM"},
-      {"component": "Trial messaging vs Test Store config", "issue": "UI advertises '7 days free' everywhere, but Test Store products have trial: null (P1W trial upsert also did not apply), so post-purchase alert says 'Subscription activated' instead of 'Your 7-day free trial has started'. Cosmetic on Test Store, but verify trial config before native release. Reference: /app/frontend/contexts/SubscriptionContext.tsx:185-190.", "testID": "", "priority": "LOW"},
-      {"component": "SubscriptionContext identity log", "issue": "Still prints '[RevenueCat] identity bound: $RCAnonymousID:...' (originalAppUserId), not the bound userId. Known from iter_26, still unfixed. Reference: /app/frontend/contexts/SubscriptionContext.tsx:91.", "testID": "", "priority": "LOW"}
+      {
+        "component": "Post-purchase navigation (SubscriptionContext.purchasePlan / subscription.tsx isSubscribed effect)",
+        "issue": "After 'Test valid purchase' and dismissing the Welcome alert, the user SEES tabs Home (tab bar + home content rendered) but the browser address bar stays at /subscription — router.replace('/(tabs)') renders the tabs without updating the web URL. Functional outcome correct; URL stale until next navigation/reload. Web-preview-only cosmetic quirk; cold reload lands on tabs correctly. Reference: /app/frontend/contexts/SubscriptionContext.tsx:191-193, /app/frontend/app/subscription.tsx:703-708.",
+        "testID": "",
+        "priority": "LOW"
+      },
+      {
+        "component": "Onboarding paywall hardcoded PLANS",
+        "issue": "Onboarding screen 25 shows hardcoded prices $89.99/yr, $12.99/mo, $7.99 'Founding Member' (PLANS const) which do NOT match the actual store checkout ($79.99/$9.99, no founding SKU). Users see different prices on the two paywalls. Reference: /app/frontend/app/onboarding.tsx:614-618.",
+        "testID": "",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "Trial messaging vs Test Store config",
+        "issue": "UI advertises '7 days free' everywhere, but Test Store products have trial: null (P1W trial upsert also did not apply), so post-purchase alert says 'Subscription activated' instead of 'Your 7-day free trial has started'. Cosmetic on Test Store, but verify trial config before native release. Reference: /app/frontend/contexts/SubscriptionContext.tsx:185-190.",
+        "testID": "",
+        "priority": "LOW"
+      },
+      {
+        "component": "SubscriptionContext identity log",
+        "issue": "Still prints '[RevenueCat] identity bound: $RCAnonymousID:...' (originalAppUserId), not the bound userId. Known from iter_26, still unfixed. Reference: /app/frontend/contexts/SubscriptionContext.tsx:91.",
+        "testID": "",
+        "priority": "LOW"
+      }
     ],
     "integration_issues": [
-      {"flow": "Paywall pricing", "issue": "STILL UNRESOLVED: Test Store dashboard serves pro.monthly=$9.99 (999 micros) and pro.annual=$79.99 (7999 micros), trial: null — the re-upsert to $12.99/$89.99 with P1W trial did not take effect despite /products returning 200. Paywall UI correctly renders the live offering prices ($9.99/$79.99). Either re-run the upsert and verify with GET, or accept current prices.", "affected_testIDs": []},
-      {"flow": "/login screen for new emails", "issue": "Login screen shows 'Account Not Found — You will be taken to onboarding' for unregistered emails (by design — account creation happens via paywall auth gate). Noted as expected behavior, not a bug.", "affected_testIDs": []}
+      {
+        "flow": "Paywall pricing",
+        "issue": "STILL UNRESOLVED: Test Store dashboard serves pro.monthly=$9.99 (999 micros) and pro.annual=$79.99 (7999 micros), trial: null — the re-upsert to $12.99/$89.99 with P1W trial did not take effect despite /products returning 200. Paywall UI correctly renders the live offering prices ($9.99/$79.99). Either re-run the upsert and verify with GET, or accept current prices.",
+        "affected_testIDs": []
+      },
+      {
+        "flow": "/login screen for new emails",
+        "issue": "Login screen shows 'Account Not Found — You will be taken to onboarding' for unregistered emails (by design — account creation happens via paywall auth gate). Noted as expected behavior, not a bug.",
+        "affected_testIDs": []
+      }
     ],
     "design_issues": [],
     "react_native_issues": [
-      {"component": "testID coverage", "issue": "Paywall CTAs (Start Free Trial, Confirm Free Trial, Restore Purchases, Continue with Email, Verify & Continue, Sign out) still lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx, /app/frontend/app/(tabs)/profile.tsx:731."},
-      {"component": "react-native-purchases-ui", "issue": "Declared in package.json but paywall is custom-built; unused dependency. Reference: /app/frontend/package.json."}
+      {
+        "component": "testID coverage",
+        "issue": "Paywall CTAs (Start Free Trial, Confirm Free Trial, Restore Purchases, Continue with Email, Verify & Continue, Sign out) still lack testID props — automation relies on exact-text matching. Reference: /app/frontend/app/subscription.tsx, /app/frontend/app/(tabs)/profile.tsx:731."
+      },
+      {
+        "component": "react-native-purchases-ui",
+        "issue": "Declared in package.json but paywall is custom-built; unused dependency. Reference: /app/frontend/package.json."
+      }
     ]
   },
   "test_report_links": [
@@ -52,7 +86,10 @@
     "No deprecated expo-av / expo-barcode-scanner / expo-background-fetch usage in RevenueCat-touched files."
   ],
   "updated_files": [],
-  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (8/8 flows: onboarding PASS, OTP login+identify PASS, annual purchase PASS, monthly purchase PASS, entitlement+settings plan PASS, cold-reload persistence PASS, restore-fresh PASS, owner bypass+rebind PASS)"},
+  "success_rate": {
+    "backend": "n/a (frontend-only)",
+    "frontend": "100% (8/8 flows: onboarding PASS, OTP login+identify PASS, annual purchase PASS, monthly purchase PASS, entitlement+settings plan PASS, cold-reload persistence PASS, restore-fresh PASS, owner bypass+rebind PASS)"
+  },
   "seed_data_creation": "Fresh accounts via OTP override (code 1234, /app/scripts/otp_override.py): test_rc2_buyer_1791140211@resend.dev (PURCHASED pro.annual $79.99 Test Store), test_rc2_nav_1791140457@resend.dev (PURCHASED pro.monthly $9.99 Test Store), test_rc2_restore_1791140602@resend.dev + test_rc2_restore_1791140689@resend.dev (no purchases, restore tested). delivered@resend.dev untouched. db.otp_log cleared per email.",
   "retest_needed": false,
   "should_main_agent_self_test": true,
