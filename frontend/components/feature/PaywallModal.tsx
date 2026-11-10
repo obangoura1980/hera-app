@@ -15,7 +15,7 @@ interface PaywallModalProps {
 
 export function PaywallModal({
   visible,
-  offeringId = 'default',
+  offeringId,
   onClose,
   onViewPlans,
 }: PaywallModalProps) {
