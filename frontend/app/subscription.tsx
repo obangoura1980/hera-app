@@ -1,7 +1,7 @@
 /**
  * app/subscription.tsx — Hera paywall
  * Step 0: Auth gate (email sign-in) so purchases are tied to the account
- * Step 1: Dynamic RevenueCat paywall (offering "default", remote template) with a
+ * Step 1: Dynamic RevenueCat paywall (identity-specific current offering) with a
  *         "Continue to App" fallback when the store returns no products
  */
 import React, { useState, useEffect, useCallback } from 'react';
@@ -37,8 +37,6 @@ function AuthGateStep({ onAuthenticated }: { onAuthenticated: () => void }) {
   const { isDark, colors: c } = useTheme();
   const { sendOTP, verifyOTPAndLogin, operationLoading } = useAuth();
   const { showAlert } = useAlert();
-  const { from } = useLocalSearchParams<{ from?: string }>();
-
   const [authStage, setAuthStage] = useState<AuthStage>('email');
   const [email, setEmail]         = useState('');
   const [normEmail, setNormEmail] = useState('');
@@ -213,28 +211,30 @@ const ag = StyleSheet.create({
 });
 
 
-// ── Paywall stage — dynamic RevenueCat paywall (remote template on offering "default") ──
+// ── Paywall stage — dynamic RevenueCat paywall from `offerings.current` ──
 // Renders RevenueCatUI.Paywall only when the native view exists AND the offering has
 // packages. Otherwise (web preview, simulators, StoreKit/Play Billing not returning
 // products, BILLING_UNAVAILABLE) shows a clean "Continue to App" screen — never a
 // dead-end or a hardcoded price list. Closing the paywall lets the user in for free;
 // premium features stay gated by their own in-app prompts.
-const OFFERING_ID = 'default';
-
 function goToApp() {
   if (router.canDismiss()) router.dismissAll();
   router.replace('/(tabs)');
 }
 
 function PaywallStage() {
+  const { offeringId } = useLocalSearchParams<{ offeringId?: string }>();
   const { offerings, isLoading, refetchOfferings } = useRCSubscription();
   const { restoreSubscription, isLoading: isRestoring } = useSubscription();
   const { isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [nativeFailed, setNativeFailed] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const handlePaywallLoadError = useCallback(() => setNativeFailed(true), []);
 
-  const offering = offerings?.all?.[OFFERING_ID] ?? offerings?.current ?? null;
+  const offering = offeringId
+    ? offerings?.all?.[offeringId] ?? null
+    : offerings?.current ?? null;
   const hasPackages = (offering?.availablePackages?.length ?? 0) > 0;
 
   const textColor = isDark ? '#FFFFFF' : '#2D1520';
@@ -253,10 +253,10 @@ function PaywallStage() {
   if (HAS_NATIVE_PAYWALL && hasPackages && !nativeFailed) {
     return (
       <RevenueCatPaywall
-        offeringId={OFFERING_ID}
+        offeringId={offeringId}
         onDismiss={goToApp}
         onPurchaseSuccess={goToApp}
-        onLoadError={() => setNativeFailed(true)}
+        onLoadError={handlePaywallLoadError}
       />
     );
   }

@@ -4,10 +4,9 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
-  Platform,
   Pressable,
 } from 'react-native';
-import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
+import RevenueCatUI from 'react-native-purchases-ui';
 import Purchases, { PurchasesOffering } from 'react-native-purchases';
 import { router } from 'expo-router';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -17,21 +16,23 @@ import { useAlert } from '@/template';
 const NO_SUBSCRIPTION_MSG = 'No active subscription was found for this account.';
 
 interface RevenueCatPaywallProps {
-  offeringId?: string; // Default: 'default'
+  // Omit to use RevenueCat's identity-specific `current` offering. Pass an ID
+  // only for an intentional, explicit offering preview.
+  offeringId?: string;
   onDismiss?: () => void;
   onPurchaseSuccess?: () => void;
   onLoadError?: () => void; // caller swaps in a local paywall instead of a dead-end
 }
 
 export function RevenueCatPaywall({
-  offeringId = 'default',
+  offeringId,
   onDismiss,
   onPurchaseSuccess,
   onLoadError,
 }: RevenueCatPaywallProps) {
   const { checkSubscription } = useSubscription();
   const { showAlert } = useAlert();
-  const { offerings, isLoading: isRCLoading } = useRCSubscription();
+  const { isLoading: isRCLoading, refetchOfferings } = useRCSubscription();
   const [selectedOffering, setSelectedOffering] = useState<PurchasesOffering | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -44,12 +45,13 @@ export function RevenueCatPaywall({
         setLoading(true);
         setLoadError(null);
 
-        // Fetch fresh offerings if not available from context
-        const allOfferings = offerings || (await Purchases.getOfferings());
-        const match =
-          allOfferings?.all?.[offeringId] ||
-          allOfferings?.current ||
-          null;
+        // Fetch on every mount so experiment assignments and dashboard
+        // customer overrides are reflected without requiring a new build.
+        const refreshed = await refetchOfferings();
+        const allOfferings = refreshed.data ?? (await Purchases.getOfferings());
+        const match = offeringId
+          ? allOfferings?.all?.[offeringId] ?? null
+          : allOfferings?.current ?? null;
 
         if (isMounted) {
           setSelectedOffering(match);
@@ -70,7 +72,7 @@ export function RevenueCatPaywall({
     return () => {
       isMounted = false;
     };
-  }, [offeringId, offerings]);
+  }, [offeringId, onLoadError, refetchOfferings]);
 
   const handleDismiss = () => {
     if (onDismiss) {

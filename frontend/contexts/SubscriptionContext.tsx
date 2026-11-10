@@ -11,7 +11,6 @@ import React, {
 } from 'react';
 import { Platform, Linking, UIManager, AppState, AppStateStatus } from 'react-native';
 import { router } from 'expo-router';
-import Purchases from 'react-native-purchases';
 import AsyncStorage from '@/src/utils/async-storage';
 import { useAuth, useAlert } from '@/template';
 import { api } from '@/src/api';
@@ -68,6 +67,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user: authUser } = useAuth();
   const { showAlert } = useAlert();
   const rc = useRCSubscription();
+  const offerings = rc.offerings;
+  const refetchCustomerInfo = rc.refetchCustomerInfo;
+  const refetchOfferings = rc.refetchOfferings;
 
   const [isLoading,       setIsLoading]       = useState(false);
   const [serverBypass,    setServerBypass]    = useState(false); // owner allowlist
@@ -76,7 +78,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [dailyChatCount,  setDailyChatCount]  = useState(0);
   const [paywallVisible,  setPaywallVisible]  = useState(false);
   const [paywallFeature,  setPaywallFeature]  = useState('AI Feature');
-  const [paywallOfferingId, setPaywallOfferingId] = useState('default');
+  const [paywallOfferingId, setPaywallOfferingId] = useState<string | undefined>(undefined);
   const [purchaseIdentityError, setPurchaseIdentityError] = useState<string | null>(null);
   const rcIdentityRef = useRef<string | null>(null);
 
@@ -91,6 +93,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
           const { customerInfo } = await rcLogIn(authUserId);
           rcIdentityRef.current = authUserId;
           setPurchaseIdentityError(null);
+          // Experiments and customer overrides are identity-specific. Refresh
+          // after logIn so `offerings.current` belongs to the authenticated user.
+          await refetchOfferings();
           console.log('[RevenueCat] identity bound:', customerInfo.originalAppUserId);
         } else if (!authUserId && rcIdentityRef.current) {
           await rcLogOut();
@@ -101,7 +106,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setPurchaseIdentityError(String(e));
       }
     })();
-  }, [authUserId]);
+  }, [authUserId, refetchOfferings]);
 
   // ── Owner allowlist (backend whitelist — not a purchase path) ───────────────
   const checkServerBypass = useCallback(async (): Promise<boolean> => {
@@ -165,8 +170,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   // ── Re-check (pull-to-refresh / app-foreground) ─────────────────────────────
   const checkSubscription = useCallback(async () => {
-    await Promise.allSettled([rc.refetchCustomerInfo(), checkServerBypass()]);
-  }, [rc, checkServerBypass]);
+    await Promise.allSettled([
+      refetchCustomerInfo(),
+      refetchOfferings(),
+      checkServerBypass(),
+    ]);
+  }, [checkServerBypass, refetchCustomerInfo, refetchOfferings]);
 
   // ── Re-verify entitlements on foreground (renewals / expirations) ──
   useEffect(() => {
@@ -278,10 +287,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const showPaywall = useCallback(async (feature = 'Premium Feature', offeringId = 'default') => {
+  const showPaywall = useCallback(async (feature = 'Premium Feature', offeringId?: string) => {
     try {
       if (Platform.OS !== 'web' && UIManager.getViewManagerConfig('PaywallView') != null) {
-        const targetOffering = rc.offerings?.all?.[offeringId] || rc.offerings?.current || undefined;
+        // Always refresh before presentation so RevenueCat experiments,
+        // targeting, and per-customer overrides can update `current`.
+        const refreshed = await refetchOfferings();
+        const latestOfferings = refreshed.data ?? offerings;
+        const targetOffering = offeringId
+          ? latestOfferings?.all?.[offeringId]
+          : latestOfferings?.current;
         // Empty offering → RevenueCatUI shows a dead-end "Paywall is not available"; use the local modal instead
         if (!targetOffering?.availablePackages?.length) throw new Error('offering has no packages');
         const RevenueCatUI = require('react-native-purchases-ui').default;
@@ -300,9 +315,18 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     setPaywallFeature(feature);
     setPaywallOfferingId(offeringId);
     setPaywallVisible(true);
-  }, [checkSubscription, rc.offerings]);
+  }, [checkSubscription, offerings, refetchOfferings]);
 
   const hidePaywall = useCallback(() => setPaywallVisible(false), []);
+
+  const openSubscription = useCallback(() => {
+    hidePaywall();
+    if (paywallOfferingId) {
+      router.push({ pathname: '/subscription', params: { offeringId: paywallOfferingId } });
+    } else {
+      router.push('/subscription');
+    }
+  }, [hidePaywall, paywallOfferingId]);
 
   const canSendChat = isSubscribed || dailyChatCount < FREE_CHAT_LIMIT;
 
@@ -336,8 +360,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         chatCount={dailyChatCount}
         chatLimit={FREE_CHAT_LIMIT}
         onClose={hidePaywall}
-        onCheckout={() => { hidePaywall(); router.push({ pathname: '/subscription', params: { offeringId: paywallOfferingId } }); }}
-        onViewPlans={() => { hidePaywall(); router.push({ pathname: '/subscription', params: { offeringId: paywallOfferingId } }); }}
+        onCheckout={openSubscription}
+        onViewPlans={openSubscription}
       />
     </SubscriptionContext.Provider>
   );
