@@ -338,10 +338,14 @@ export function HeraProvider({ children }: { children: ReactNode }) {
         user: userRef.current,
       });
       applyRemoteData(result);
-      const now = new Date().toISOString();
-      setLastSyncedAt(now);
-      await AsyncStorage.setItem(KEYS.LAST_SYNC, now);
-      setSyncStatus(result.errors.length > 0 ? 'error' : 'success');
+      if (result.errors.length > 0) {
+        setSyncStatus('error');
+      } else {
+        const now = new Date().toISOString();
+        setLastSyncedAt(now);
+        await AsyncStorage.setItem(KEYS.LAST_SYNC, now);
+        setSyncStatus('success');
+      }
     } catch {
       setSyncStatus('error');
     } finally {

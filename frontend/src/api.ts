@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import { fetch as expoFetch } from "expo/fetch";
 
 import { storage } from "@/src/utils/storage";
+import { assertOnline } from "@/src/utils/network";
 
 export const API = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
 const TOKEN_KEY = "hera_token";
@@ -34,6 +35,7 @@ function errorMessage(body: any, status: number) {
 }
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+  assertOnline();
   const res = await fetch(`${API}${path}`, {
     method: opts.method ?? "GET",
     headers: {
@@ -48,6 +50,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 }
 
 export async function uploadImage(uri: string, name: string, type: string): Promise<string> {
+  assertOnline();
   const form = new FormData();
   if (Platform.OS === "web") {
     const blob = await (await fetch(uri)).blob();
@@ -73,6 +76,7 @@ export function fileSource(path: string) {
 }
 
 export async function streamCoach(text: string, onDelta: (t: string) => void): Promise<void> {
+  assertOnline();
   const res = await expoFetch(`${API}/coach/stream`, {
     method: "POST",
     headers: {

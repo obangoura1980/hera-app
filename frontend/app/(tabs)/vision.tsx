@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
 import { useFocusEffect, router } from 'expo-router';
 import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -578,6 +579,7 @@ function VisionDetailModal({
   const insets = useSafeAreaInsets();
   const { colors: c, isDark } = useTheme();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
 
   if (!item) return null;
 
@@ -594,6 +596,7 @@ function VisionDetailModal({
     : (['#FDE8EA', '#F9D5D9', '#F5C2C7'] as const);
 
   const handleDelete = () => {
+    if (!requireOnline()) return;
     showAlert('Remove Vision', `Remove "${item.title}" from your vision board?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => { onClose(); onDelete(item.id); } },
@@ -723,6 +726,7 @@ export default function VisionScreen() {
   const { colors: c, isDark } = useTheme();
   const { visionItems, addVisionItem, deleteVisionItem, updateUser } = useHera();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
 
   const screenOpacity = useSharedValue(0);
   const screenSlide   = useSharedValue(10);
@@ -751,8 +755,9 @@ export default function VisionScreen() {
   const manifested = useMemo(() => visionItems.filter(v => v.progress >= 100).length, [visionItems]);
 
   const handleDelete = useCallback((id: string) => {
+    if (!requireOnline()) return;
     deleteVisionItem(id);
-  }, [deleteVisionItem]);
+  }, [deleteVisionItem, requireOnline]);
 
   const handleCardPress = useCallback((item: VisionItem) => {
     setDetailItem(item);
@@ -776,18 +781,20 @@ export default function VisionScreen() {
   }, []);
 
   const handleAdd = useCallback((item: Omit<VisionItem, 'id' | 'createdAt'>) => {
+    if (!requireOnline()) return;
     addVisionItem(item);
     setShowAddModal(false);
-  }, [addVisionItem]);
+  }, [addVisionItem, requireOnline]);
 
   // Edit: delete old + re-add with same ID pattern (context doesn't expose update, so we remove+add)
   const handleSaveEdit = useCallback((updated: Omit<VisionItem, 'id' | 'createdAt'>) => {
     if (!editItem) return;
+    if (!requireOnline()) return;
     deleteVisionItem(editItem.id);
     addVisionItem(updated);
     setShowEditModal(false);
     setEditItem(null);
-  }, [editItem, deleteVisionItem, addVisionItem]);
+  }, [editItem, deleteVisionItem, addVisionItem, requireOnline]);
 
   const bgColors = isDark
     ? (['#080A18', '#0F1025', '#131838'] as const)
@@ -809,7 +816,7 @@ export default function VisionScreen() {
               <Text style={{ fontSize: FontSize.xs, color: c.gold, fontWeight: '600' }}>🏆 {manifested} manifested</Text>
             </View>
           )}
-          <Pressable onPress={() => setShowAddModal(true)} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden' }, pressed && { opacity: 0.82 }]}>
+          <Pressable onPress={() => { if (requireOnline()) setShowAddModal(true); }} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden' }, pressed && { opacity: 0.82 }]}>
             <LinearGradient colors={[c.primary, c.primaryDark]} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="add" size={24} color="white" />
             </LinearGradient>
@@ -858,7 +865,7 @@ export default function VisionScreen() {
                 ? 'Add your first dream and watch the universe conspire in your favor'
                 : `No ${filterCat} visions yet — add one to begin`}
             </Text>
-            <Pressable onPress={() => setShowAddModal(true)} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden', marginTop: Spacing.sm }, pressed && { opacity: 0.85 }]}>
+            <Pressable onPress={() => { if (requireOnline()) setShowAddModal(true); }} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden', marginTop: Spacing.sm }, pressed && { opacity: 0.85 }]}>
               <LinearGradient colors={[c.primary, c.primaryDark]} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md }}>
                 <Ionicons name="add-circle" size={18} color="white" />
                 <Text style={{ fontSize: FontSize.base, color: 'white', fontWeight: '700' }}>Add Vision</Text>

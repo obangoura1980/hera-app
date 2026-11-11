@@ -78,8 +78,6 @@ const { width } = Dimensions.get('window');
 const AMBIENT_URL = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3';
 const AUDIO_TARGET_VOL   = 0.3;
 const AUDIO_FADE_IN_MS   = 500;
-const AUDIO_FADE_OUT_MS  = 1000;
-const AUDIO_FULL_PLAY_MS = 3000;
 const TOTAL_Q = 20;
 
 interface Contact { name: string; relationship: string; }
@@ -638,6 +636,8 @@ export default function Onboarding() {
     });
   }, []);
   const [isMuted, setIsMuted] = useState(false);
+  const audioStartingRef = useRef(false);
+  const audioStartedAtRef = useRef(0);
   const isMutedRef = useRef(false); // ref so intervals always read current mute state
 
   // ── Answers ────────────────────────────────────────────────────────────
@@ -685,41 +685,12 @@ export default function Onboarding() {
     } catch {}
   }, [clearAudioTimers]);
 
-  const fadeOutAndStop = useCallback(() => {
-    clearAudioTimers();
-    const s = soundRef.current;
-    if (!s) return;
-    soundRef.current = null;
-    const STEPS    = 15;
-    const INTERVAL = Math.round(AUDIO_FADE_OUT_MS / STEPS);
-    let step = 0;
-    fadeOutInterval.current = setInterval(async () => {
-      step++;
-      const vol = Math.max(0, AUDIO_TARGET_VOL * (1 - step / STEPS));
-      try { await s.setVolumeAsync(vol); } catch {}
-      if (step >= STEPS) {
-        clearInterval(fadeOutInterval.current!); fadeOutInterval.current = null;
-        s.stopAsync().catch(() => {}); s.unloadAsync().catch(() => {});
-      }
-    }, INTERVAL);
-  }, [clearAudioTimers]);
 
   // ── Mute toggle ──────────────────────────────────────────────────────────
-  const toggleMute = useCallback(() => {
-    setIsMuted(prev => {
-      const next = !prev;
-      isMutedRef.current = next;
-      if (soundRef.current) {
-        soundRef.current.setVolumeAsync(next ? 0 : AUDIO_TARGET_VOL).catch(() => {});
-      }
-      return next;
-    });
-  }, []);
-
   const startAudio = useCallback(async () => {
-    if (soundRef.current) return;
+    if (soundRef.current || audioStartingRef.current) return;
+    audioStartingRef.current = true;
     try {
-      if (!Audio?.setAudioModeAsync) return;
       await Audio.setAudioModeAsync({
         allowsRecordingIOS:     false,
         playsInSilentModeIOS:   true,
@@ -731,6 +702,7 @@ export default function Onboarding() {
         { shouldPlay: true, isLooping: true, volume: 0 }
       );
       soundRef.current = sound;
+      audioStartedAtRef.current = Date.now();
       const FADE_IN_STEPS    = 10;
       const FADE_IN_INTERVAL = Math.round(AUDIO_FADE_IN_MS / FADE_IN_STEPS);
       let inStep = 0;
@@ -742,9 +714,36 @@ export default function Onboarding() {
           clearInterval(fadeInInterval.current!); fadeInInterval.current = null;
         }
       }, FADE_IN_INTERVAL);
-      autoStopTimer.current = setTimeout(() => fadeOutAndStop(), AUDIO_FULL_PLAY_MS);
-    } catch {}
-  }, [fadeOutAndStop]);
+    } catch (e) {
+      if (__DEV__) console.warn('[Onboarding] music failed to start', e);
+      soundRef.current = null;
+    } finally {
+      audioStartingRef.current = false;
+    }
+  }, []);
+
+  // Speaker button: starts the music if it isn't playing (any onboarding step),
+  // otherwise toggles mute on the playing track.
+  const toggleMute = useCallback(async () => {
+    const restart = () => {
+      isMutedRef.current = false;
+      setIsMuted(false);
+      startAudio();
+    };
+    if (!soundRef.current) { restart(); return; }
+    // A track that failed to load (or was blocked) is not playing — recreate it
+    // instead of only changing the volume of a silent player.
+    // Allow a few seconds of buffering on slow networks before treating it as failed.
+    const status = await soundRef.current.getStatusAsync().catch(() => ({ isPlaying: false }));
+    const buffering = Date.now() - audioStartedAtRef.current < 6000;
+    if (!status.isPlaying && !isMutedRef.current && !buffering) { stopAudioNow(); restart(); return; }
+    setIsMuted(prev => {
+      const next = !prev;
+      isMutedRef.current = next;
+      soundRef.current?.setVolumeAsync(next ? 0 : AUDIO_TARGET_VOL).catch(() => {});
+      return next;
+    });
+  }, [startAudio, stopAudioNow]);
 
   useEffect(() => {
     return () => { stopAudioNow(); };
@@ -755,8 +754,9 @@ export default function Onboarding() {
   // ── Navigation ─────────────────────────────────────────────────────────
   const goNext = useCallback(() => { Keyboard.dismiss(); setScreen(s => s + 1); }, []);
   const goBack = useCallback(() => { Keyboard.dismiss(); setScreen(s => Math.max(1, s - 1)); }, []);
-  const stopAndGoNext = useCallback(() => { stopAudioNow(); goNext(); }, [stopAudioNow, goNext]);
-  const stopAndGoBack = useCallback(() => { stopAudioNow(); goBack(); }, [stopAudioNow, goBack]);
+  // Music keeps playing across onboarding steps; it stops only when onboarding ends.
+  const stopAndGoNext = goNext;
+  const stopAndGoBack = goBack;
 
   // ── Shared: persist answers to AsyncStorage then navigate ───────────────
   // Writing to AsyncStorage BEFORE router.replace() ensures the home screen

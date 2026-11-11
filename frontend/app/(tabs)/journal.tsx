@@ -11,6 +11,7 @@ import { JournalEntryCard } from '@/components/feature/JournalEntryCard';
 import { MoodSelector } from '@/components/feature/MoodSelector';
 import { Button } from '@/components/ui/Button';
 import { useAlert } from '@/template';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
 import { useFocusEffect } from 'expo-router';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
@@ -166,6 +167,7 @@ export default function JournalScreen() {
   const s = useMemo(() => createStyles(c), [c]);
   const { journalEntries, addJournalEntry, deleteJournalEntry } = useHera();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
 
   const screenOpacity = useSharedValue(0);
   const screenSlide = useSharedValue(10);
@@ -201,6 +203,7 @@ export default function JournalScreen() {
   const handleSave = useCallback(() => {
     const trimmedContent = entryContent.trim();
     if (!trimmedContent) return;
+    if (!requireOnline()) return;
     addJournalEntry({ title: entryTitle.trim() || 'My Entry', content: trimmedContent, mood: entryMood, type: entryType });
     // Reset form
     setEntryTitle('');
@@ -210,8 +213,9 @@ export default function JournalScreen() {
     setShowModal(false);
     // Reset filter to 'all' so the new entry is always visible
     setFilter('all');
-  }, [entryContent, entryTitle, entryMood, entryType, addJournalEntry]);
+  }, [entryContent, entryTitle, entryMood, entryType, addJournalEntry, requireOnline]);
   const handleDelete = (id: string) => {
+    if (!requireOnline()) return;
     showAlert(
       'Delete Entry',
       'Are you sure you want to delete this journal entry? This action cannot be undone.',
@@ -221,6 +225,7 @@ export default function JournalScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            if (!requireOnline()) return;
             deleteJournalEntry(id);
           },
         },

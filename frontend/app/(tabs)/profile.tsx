@@ -21,6 +21,7 @@ import { api } from '@/src/api';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth, useAlert } from '@/template';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
 import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 import { requestNotificationPermissions, formatTime } from '@/services/notificationService';
 import { ActivityIndicator } from 'react-native';
@@ -281,6 +282,7 @@ function ProfileScreen() {
   const { user, updateUser, journalEntries, visionItems, favoriteAffirmations, notifMorning, notifEvening, updateNotifMorning, updateNotifEvening, syncStatus, lastSyncedAt, syncNow, isAuthenticated } = useHera();
   const { user: authUser, logout } = useAuth();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
   const { isSubscribed, isTrial, plan, planLabel, subscriptionEnd, openPortal } = useSubscription();
 
   const screenOpacity = useSharedValue(0);
@@ -308,6 +310,7 @@ function ProfileScreen() {
   }, [authUser?.id]);
 
   const handlePickAvatar = useCallback(async () => {
+    if (!requireOnline()) return;
     if (!authUser?.id) {
       showAlert('Sign In Required', 'Please sign in to upload a custom avatar.');
       return;
@@ -412,6 +415,7 @@ function ProfileScreen() {
   }, [otpCode]);
 
   const handleSendDeletionOTP = useCallback(async () => {
+    if (!requireOnline()) return;
     if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') { showAlert('Confirmation Required', 'Please type DELETE in the field to confirm.'); return; }
     setDeleteLoading(true);
     try {
@@ -438,6 +442,7 @@ function ProfileScreen() {
 
   const handleVerifyAndDelete = useCallback(async () => {
     if (otpString.length < 4) return;
+    if (!requireOnline()) return;
     setOtpLoading(true);
     try {
       const { getSupabaseClient } = await import('@/template');
@@ -478,6 +483,7 @@ function ProfileScreen() {
   }, [deleteStep, logout]);
 
   const handleReset = () => {
+    if (!requireOnline()) return;
     showAlert('Reset Journey', 'This will clear all your manifestation preferences and restart your onboarding. Continue?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -717,7 +723,7 @@ function ProfileScreen() {
                   <Text style={{ fontSize: FontSize.xs, color: c.textSubtle }} numberOfLines={1}>{isAuthenticated ? syncCfg.label : 'Sign in to enable sync'}</Text>
                 </View>
               </View>
-              {isAuthenticated && syncStatus !== 'syncing' && <Pressable onPress={syncNow} hitSlop={12} style={s.syncBtn}><Ionicons name="refresh" size={16} color={c.textSubtle} /></Pressable>}
+              {isAuthenticated && syncStatus !== 'syncing' && <Pressable onPress={() => { if (requireOnline()) syncNow(); }} hitSlop={12} style={s.syncBtn}><Ionicons name="refresh" size={16} color={c.textSubtle} /></Pressable>}
             </View>
             <View style={s.dividerLine} />
             {isAuthenticated ? (

@@ -7,6 +7,7 @@ import { useHera } from '@/hooks/useHera';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
 import { streamHeraResponse } from '@/services/heraAI';
 import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 import { ChatBubble } from '@/components/feature/ChatBubble';
@@ -62,6 +63,7 @@ export default function ChatScreen() {
   const { chatHistory, addMessage, clearChat, user } = useHera();
   const { canSendChat, isSubscribed, dailyChatCount, showPaywall, incrementChatCount } = useSubscription();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
 
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -125,6 +127,7 @@ export default function ChatScreen() {
   }, []);
 
   const handleClearChat = useCallback(() => {
+    if (!requireOnline()) return;
     showAlert('Clear Conversation', 'Start a fresh conversation with Hera?', [
       { text: 'Keep', style: 'cancel' },
       {
@@ -137,11 +140,12 @@ export default function ChatScreen() {
         },
       },
     ]);
-  }, [clearChat, showAlert]);
+  }, [clearChat, showAlert, requireOnline]);
 
   const send = async (text?: string) => {
     const msg = (text || input).trim();
     if (!msg || streaming) return;
+    if (!requireOnline()) return;
     if (!canSendChat) { showPaywall('AI Chat Limit'); return; }
 
     setInput('');
