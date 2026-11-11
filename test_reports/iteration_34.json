@@ -1,0 +1,43 @@
+{
+  "summary": "Tested the 4 fixes (A image links, B journal delete confirm in preview, C account data isolation, D 'Date Not Set') on backend (pytest, 13 tests) and the Expo web preview (390x844). A: Unsplash direct link and Google imgres link both show a preview. 'abc' shows a red hint (rgb 248,113,113). An unreachable https link shows the 'Couldn't load image' fallback. A saved link shows on the card. D: a vision with no date shows 'Date Not Set' on the card and in the detail modal. A vision with date 2027-06-01 shows 202d. B: the Delete Entry confirm renders inside the preview sheet. Cancel keeps the sheet open, Delete removes the entry and closes the sheet. Offline shows 'No Internet Connection' and no confirm. C: demo A creates TEST_A_ENTRY, signs out, then delivered@resend.dev (B) signs in via OTP override. B's Journal shows 0 entries and Vision is empty. Local storage has no A data and the owner id is B's. Signing back in as A works without a crash, but A's local data is gone (expected per E1). The backend /api/journal is scoped per user: B cannot list or delete A's entry. Backend: 11/13 pass. The 2 failures come from cdn.pixabay.com itself. The specific Pixabay test asset (tree-736885) returns Cloudflare-cached S3 403 AccessDenied about 70% of the time from the server IP. Another Pixabay CDN image returned 200 on 5 of 5 calls.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/images/resolve & /api/images/proxy (cdn.pixabay.com)", "issue": "The specific Pixabay test asset is flaky: cdn.pixabay.com serves a Cloudflare-cached 403 <Error><Code>AccessDenied</Code> (s-maxage=5) in 5s windows. Measured from the container with curl and through the proxy: 200 422 422 422 200 422 422 422 200 422. Resolve then returns 422 'That page blocks previews...' and proxy returns 422 'Not an image'. A different Pixabay CDN image (sunset-1373171_1280.jpg) returned 200 on 5 of 5 calls. Cache-busting query params did not help."},
+      {"endpoint": "GET /api/images/resolve", "issue": "A well-formed https link whose host doesn't resolve returns 400 'Please enter a valid image link (http/https).' The user sees that hint under a valid-looking https URL. Cause: _public_http_url() returns False when getaddrinfo fails. DNS failures should return 422 'That link couldn't be reached.', and the 400 should be kept only for a bad scheme or a private IP."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Vision > New Vision preview fallback", "issues": ["The 'Couldn't load image — use a direct image link' text (c.textSubtle, xs) sits under the dark bottom gradient (rgba 0,0,0,0.85) and the category pill, so it is barely readable. Render the gradient/pill only when the image actually loads, or raise the contrast of the fallback text."]},
+      {"screen": "Profile > Sign Out alert", "issues": ["The copy says 'Your data will remain on this device', but when a different account signs in, all local journals/visions/chat are wiped. With the cloud sync shim being a no-op, A's data is lost for good (verified: A signs back in and sees 0 entries). Change the copy or warn the user."]},
+      {"screen": "Profile after account switch", "issues": ["User B (delivered@resend.dev, name Maya) shows 'Beautiful Soul' / 'BS' because the @hera_user profile is wiped and not re-fetched from the server profile."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_image_links.py", "/app/test_reports/pytest/pytest_image_links.xml"],
+  "action_items": [
+    "Images: in /api/images/resolve and /api/images/proxy, retry a 403 from the upstream image host 2-3 times with about 2s backoff (Pixabay's CDN cache returns 403 in 5s windows). Alternatively, for a Google imgres link whose decoded URL has an image extension, return the decoded URL even if the server-side check gets a 403, so the client can try loading it directly.",
+    "Images: return 422 'That link couldn't be reached.' (not 400 'valid image link') when DNS lookup fails in _public_http_url.",
+    "Vision form: make the 'Couldn't load image' fallback readable. Don't draw the dark gradient or category pill over the error state.",
+    "Profile: change the Sign Out copy ('Your data will remain on this device'), because an account switch wipes local data. Consider re-fetching the server profile (name) after the switch.",
+    "syncService.ts:117: send target_date: v.targetDate || null rather than an empty string, in case a real backend has a date column.",
+    "Add testIDs to the journal preview trash/confirm buttons, the Vision '+' button, the form inputs and the cards. There are currently none in journal.tsx or vision.tsx, so tests rely on aria-labels and coordinates."
+  ],
+  "critical_code_review_comments": [
+    "vision.tsx (972 lines) is over 700 lines. Split VisionImage, VisionFormModal and the detail modal into separate modules.",
+    "journal.tsx:241 handleDelete (list-card trash) still uses showAlert, which is a Modal at the root. That is fine for the list. The preview sheet uses the new in-sheet confirm.",
+    "HeraContext applySession: wiping on owner mismatch works. Because sync is a no-op, the previous account's local data is lost for good. This is a product decision, but make it explicit to the user.",
+    "Offline alert (template/ui/context.tsx) is a separate RN Modal shown over the journal detail Modal. It stacks correctly on web. iOS stacking of two Modals could not be checked in the web preview.",
+    "SSRF guard is good: blocks loopback/private/link-local and a Google imgres link wrapping 127.0.0.1. However, follow_redirects=True does not re-check redirect targets against private IPs (redirect-based SSRF). Use an httpx event hook to validate each redirect hop."
+  ],
+  "updated_files": ["/app/backend/tests/test_image_links.py"],
+  "success_rate": {"backend": "85% (11/13; the 2 failures are the flaky upstream Pixabay CDN asset)", "frontend": "100% of requested flows (A, B, C, D) pass; 3 minor design/copy issues"},
+  "seed_data_creation": "None in DB. The backend isolation test creates TEST_A_ISO on demo and deletes it by id. UI entries were local only (fresh browser contexts). OTP override for delivered@resend.dev via tests/otp_override_watcher.py (watcher killed afterwards).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: localStorage hera_onboarded='\"true\"', /login, demo@heraapp.com + password field '1234'. A brand-new email shows 'Account Not Found' and goes to onboarding, so use delivered@resend.dev for user B: run `python tests/otp_override_watcher.py delivered@resend.dev 4321 400 &` and fill input[placeholder='• • • •']. Journal preview trash: [aria-label='Delete entry']. Profile sign out: get_by_text('Sign out').first, then .last in the alert. Vision + at (344,33). Image URL input: placeholder 'https://images.unsplash.com/...'. The tree-736885 Pixabay asset is flaky upstream; use sunset-1373171_1280.jpg for stable tests.",
+  "rca_of_issue": "Pixabay failure RCA: running curl from the container directly against cdn.pixabay.com returns HTTP 403 with content-type image/jpeg, but the body is S3 XML AccessDenied, cf-cache-status HIT, s-maxage=5. Cloudflare caches the origin's 403 for 5s windows, so the backend sees the same failures. The backend code is correct; add a retry with backoff to mitigate."
+}

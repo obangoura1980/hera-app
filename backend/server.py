@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
 from bson import ObjectId
 import os
+import asyncio
 import json
 import uuid
 import logging
@@ -903,6 +904,148 @@ async def hera_chat(data: HeraChatIn, creds: Optional[HTTPAuthorizationCredentia
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------- external image links (vision board)
+# Users paste links from Google Images / Unsplash / Pixabay. Many are web *pages*, not images,
+# and some CDNs block hotlinking from apps. /images/resolve turns a pasted link into a direct
+# image URL; /images/proxy fetches the image server-side with browser headers.
+from urllib.parse import parse_qs, unquote
+import socket
+
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    # Image-first Accept: some CDNs (Pixabay) reject requests that also ask for text/html.
+    "Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+}
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def _url_check(url: str) -> str:
+    """'ok' | 'invalid' (bad scheme / private network — SSRF) | 'unreachable' (DNS fails)."""
+    p = urlparse(url)
+    if p.scheme not in ("http", "https") or not p.hostname:
+        return "invalid"
+    try:
+        infos = socket.getaddrinfo(p.hostname, None)
+    except Exception:
+        return "unreachable"
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            return "invalid"
+    return "ok"
+
+
+def _public_http_url(url: str) -> bool:
+    return _url_check(url) == "ok"
+
+
+async def _guard_redirect(request: httpx.Request):
+    # Re-check every hop (incl. redirects) so a public URL can't bounce to a private host.
+    if not _public_http_url(str(request.url)):
+        raise httpx.RequestError("blocked host", request=request)
+
+
+def _image_client(timeout: int) -> httpx.AsyncClient:
+    return httpx.AsyncClient(follow_redirects=True, timeout=timeout, headers=_BROWSER_HEADERS,
+                             event_hooks={"request": [_guard_redirect]})
+
+
+def _check_or_raise(url: str):
+    status = _url_check(url)
+    if status == "invalid":
+        raise HTTPException(400, "Please enter a valid image link (http/https).")
+    if status == "unreachable":
+        raise HTTPException(422, "That link couldn't be reached.")
+
+
+def _normalise_image_link(url: str) -> str:
+    url = url.strip()
+    p = urlparse(url)
+    host = (p.hostname or "").lower()
+    qs = parse_qs(p.query)
+    # Google Images result link: ...google.com/imgres?imgurl=<direct image>
+    if "google." in host and "imgurl" in qs:
+        return unquote(qs["imgurl"][0])
+    # Unsplash photo page: unsplash.com/photos/<slug>-<id>  → direct download redirect
+    if host in ("unsplash.com", "www.unsplash.com") and p.path.startswith("/photos/"):
+        slug = p.path.split("/")[2] if len(p.path.split("/")) > 2 else ""
+        if slug:
+            photo_id = slug.rsplit("-", 1)[-1]
+            return f"https://unsplash.com/photos/{photo_id}/download?force=true&w=1080"
+    return url
+
+
+class _MetaImageParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.image: Optional[str] = None
+
+    def handle_starttag(self, tag, attrs):
+        if self.image or tag != "meta":
+            return
+        a = dict(attrs)
+        key = (a.get("property") or a.get("name") or "").lower()
+        if key in ("og:image", "og:image:secure_url", "twitter:image") and a.get("content"):
+            self.image = a["content"]
+
+
+@api.get("/images/resolve")
+async def resolve_image(url: str):
+    target = _normalise_image_link(url)
+    _check_or_raise(target)
+    # Google Images links wrap the real image URL — trust it even if the host blocks our check.
+    from_google = target != url.strip() and "unsplash.com/photos/" not in target
+    try:
+        async with _image_client(10) as hc:
+            async with hc.stream("GET", target) as r:
+                ctype = r.headers.get("content-type", "").lower()
+                final = str(r.url)
+                if r.status_code >= 400:
+                    if from_google or ctype.startswith("image/"):
+                        return {"url": target}
+                    raise HTTPException(422, "That page blocks previews. Open the image, long-press it and choose \"Copy image address\", then paste that link.")
+                if ctype.startswith("image/"):
+                    return {"url": final if "unsplash.com/photos/" in target else target}
+                if "html" not in ctype:
+                    raise HTTPException(422, "That link isn't an image.")
+                body = b""
+                async for chunk in r.aiter_bytes():
+                    body += chunk
+                    if len(body) > 1_500_000:
+                        break
+        parser = _MetaImageParser()
+        parser.feed(body.decode("utf-8", "ignore"))
+        if parser.image:
+            img = parser.image if parser.image.startswith("http") else str(httpx.URL(final).join(parser.image))
+            return {"url": img}
+        raise HTTPException(422, "No image found on that page — use a direct image link.")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(422, "That link couldn't be reached.")
+
+
+@api.get("/images/proxy")
+async def proxy_image(url: str):
+    _check_or_raise(url)
+    try:
+        async with _image_client(15) as hc:
+            r = await hc.get(url)
+            # Some CDNs (Pixabay) briefly cache an "Access Denied" — retry a couple of times.
+            for _ in range(2):
+                if r.status_code != 403:
+                    break
+                await asyncio.sleep(2)
+                r = await hc.get(url)
+    except Exception:
+        raise HTTPException(502, "Image unreachable")
+    ctype = r.headers.get("content-type", "").lower()
+    if r.status_code >= 400 or not ctype.startswith("image/") or len(r.content) > _MAX_IMAGE_BYTES:
+        raise HTTPException(422, "Not an image")
+    return Response(content=r.content, media_type=ctype, headers={"Cache-Control": "public, max-age=86400"})
+
 
 
 app.include_router(api)

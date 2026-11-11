@@ -43,10 +43,16 @@ const TYPE_LABELS: Record<string, string> = {
 interface DetailViewProps {
   entry: { id: string; date: string; title: string; content: string; mood: number; type: string };
   onClose: () => void;
+  /** Called after the user confirms inside the preview. */
   onDelete: () => void;
+  /** Checked before the confirm is shown (e.g. offline guard). */
+  canDelete: () => boolean;
 }
-function DetailView({ entry, onClose, onDelete }: DetailViewProps) {
+function DetailView({ entry, onClose, onDelete, canDelete }: DetailViewProps) {
   const insets = useSafeAreaInsets();
+  // Confirmation is rendered inside the preview sheet itself, so it always appears
+  // on the screen where Delete was tapped (no second Modal / no closing first).
+  const [confirming, setConfirming] = useState(false);
   const { colors: c, isDark } = useTheme();
   const typeColor = TYPE_COLORS[entry.type] || c.primaryLight;
   const typeLabel = TYPE_LABELS[entry.type] || entry.type;
@@ -66,7 +72,7 @@ function DetailView({ entry, onClose, onDelete }: DetailViewProps) {
           <View style={{ paddingHorizontal: Spacing.md, paddingVertical: 5, borderRadius: Radius.full, borderWidth: 1, backgroundColor: typeColor + '18', borderColor: typeColor + '50' }}>
             <Text style={{ fontSize: FontSize.sm, color: typeColor, fontWeight: '700' }}>{typeLabel}</Text>
           </View>
-          <Pressable onPress={onDelete} hitSlop={12} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', alignItems: 'center', justifyContent: 'center' }}>
+          <Pressable onPress={() => { if (canDelete()) setConfirming(true); }} hitSlop={12} accessibilityLabel="Delete entry" style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(239,68,68,0.08)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)', alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="trash-outline" size={18} color={c.error} />
           </Pressable>
         </View>
@@ -111,6 +117,24 @@ function DetailView({ entry, onClose, onDelete }: DetailViewProps) {
           </View>
         )}
       </ScrollView>
+      {confirming && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: Spacing.xl }]}>
+          <View style={{ width: '100%', maxWidth: 340, backgroundColor: c.card, borderRadius: Radius.xl, borderWidth: 1, borderColor: c.border, padding: Spacing.lg, gap: Spacing.md }}>
+            <Text style={{ fontSize: FontSize.lg, color: c.textWhite, fontWeight: '700', textAlign: 'center' }}>Delete Entry</Text>
+            <Text style={{ fontSize: FontSize.sm, color: c.textMuted, textAlign: 'center', lineHeight: 20 }}>
+              Are you sure you want to delete this journal entry? This action cannot be undone.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
+              <Pressable onPress={() => setConfirming(false)} style={{ flex: 1, paddingVertical: 12, borderRadius: Radius.lg, borderWidth: 1, borderColor: c.border, alignItems: 'center' }}>
+                <Text style={{ color: c.textMuted, fontWeight: '600', fontSize: FontSize.base }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={() => { if (canDelete()) { setConfirming(false); onDelete(); } }} style={{ flex: 1, paddingVertical: 12, borderRadius: Radius.lg, backgroundColor: c.error, alignItems: 'center' }}>
+                <Text style={{ color: 'white', fontWeight: '700', fontSize: FontSize.base }}>Delete</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -310,7 +334,7 @@ export default function JournalScreen() {
         <Pressable style={s.detailOverlay} onPress={closeDetail}>
           <Pressable style={s.detailSheet} onPress={e => e.stopPropagation()}>
             <LinearGradient colors={modalBgColors} style={{ flex: 1 }}>
-              {detailEntry ? <DetailView entry={detailEntry} onClose={closeDetail} onDelete={() => { const idToDelete = detailEntry.id; closeDetail(); setTimeout(() => handleDelete(idToDelete), 350); }} /> : null}
+              {detailEntry ? <DetailView entry={detailEntry} onClose={closeDetail} canDelete={requireOnline} onDelete={() => { deleteJournalEntry(detailEntry.id); closeDetail(); }} /> : null}
             </LinearGradient>
           </Pressable>
         </Pressable>
@@ -319,7 +343,7 @@ export default function JournalScreen() {
       {/* Add Entry Modal */}
       <Modal visible={showModal} transparent animationType="slide" onRequestClose={handleCloseModal}>
         <KeyboardAvoidingView style={{ flex: 1, justifyContent: 'flex-end' }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <Pressable style={StyleSheet.absoluteFillObject} onPress={handleCloseModal} />
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleCloseModal} />
           <View style={{ borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, overflow: 'hidden', paddingBottom: insets.bottom + Spacing.lg }}>
             <LinearGradient colors={modalBgColors} style={s.modalContent}>
               <View style={s.handle} />

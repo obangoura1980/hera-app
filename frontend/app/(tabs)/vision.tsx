@@ -11,6 +11,7 @@ import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
 import { useRequireOnline } from '@/src/utils/useRequireOnline';
+import { API } from '@/src/api';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -192,12 +193,13 @@ function VisionImage({
   fallbackAccent?: string;
 }) {
   const [errored, setErrored] = useState(false);
+  const [useProxy, setUseProxy] = useState(false);
   const { colors: c } = useTheme();
 
   // Normalise the URI — strip leading/trailing whitespace
   const cleanUri = uri?.trim() ?? '';
   const isValid = cleanUri.startsWith('http://') || cleanUri.startsWith('https://');
-  useEffect(() => { setErrored(false); }, [cleanUri]);
+  useEffect(() => { setErrored(false); setUseProxy(false); }, [cleanUri]);
 
   // Never swap in a random image — show an honest "unavailable" state instead
   if (!isValid || errored) {
@@ -212,14 +214,17 @@ function VisionImage({
     );
   }
 
+  // Direct load first; if the host blocks hotlinking/CORS, retry once through our
+  // backend image proxy (fetches server-side with browser headers).
   return (
     <Image
-      // Browser-like UA: some CDNs (e.g. Pixabay) reject default native agents
-      source={{ uri: cleanUri, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36', Accept: 'image/*' } }}
+      source={useProxy
+        ? { uri: `${API}/images/proxy?url=${encodeURIComponent(cleanUri)}` }
+        : { uri: cleanUri, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36', Accept: 'image/*' } }}
       style={style}
       contentFit="cover"
       transition={300}
-      onError={() => setErrored(true)}
+      onError={() => (useProxy ? setErrored(true) : setUseProxy(true))}
       cachePolicy="memory-disk"
     />
   );
@@ -274,12 +279,12 @@ const MasonryCard = React.memo(function MasonryCard({
         <Text style={{ fontSize: FontSize.sm, color: c.textWhite, fontWeight: '600', lineHeight: 19 }} numberOfLines={2}>{item.title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
           <Text style={{ fontSize: FontSize.xs, color: accent, fontWeight: '700' }}>{item.progress}%</Text>
-          {daysLeft !== null && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              <Ionicons name="time-outline" size={10} color={c.textSubtle} />
-              <Text style={{ fontSize: 10, color: c.textSubtle }}>{daysLeft}d</Text>
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Ionicons name="time-outline" size={10} color={c.textSubtle} />
+            <Text style={{ fontSize: 10, color: c.textSubtle }}>
+              {!item.targetDate ? 'Date Not Set' : daysLeft !== null ? `${daysLeft}d` : item.targetDate}
+            </Text>
+          </View>
         </View>
       </View>
     </Pressable>
@@ -374,7 +379,35 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
   }, [visible, initial]);
 
   const accent = CAT_COLOR[cat] ?? c.gold;
-  const previewUri = imgUrl.trim().startsWith('http') ? imgUrl.trim() : null;
+  // Pasted links (Google Images result pages, Unsplash/Pixabay pages…) are resolved by the
+  // backend into a direct image URL before previewing/saving.
+  const [resolvedUri, setResolvedUri] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  useEffect(() => {
+    const raw = imgUrl.trim();
+    setLinkError(null);
+    if (!raw) { setResolvedUri(null); setResolving(false); return; }
+    if (!/^https?:\/\//i.test(raw)) { setResolvedUri(null); setLinkError('Link must start with http:// or https://'); return; }
+    if (raw === initial?.imageUrl) { setResolvedUri(raw); return; }
+    let cancelled = false;
+    setResolving(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`${API}/images/resolve?url=${encodeURIComponent(raw)}`);
+        const data = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (r.ok && data.url) setResolvedUri(data.url);
+        else { setResolvedUri(raw); setLinkError(data.detail || "Couldn't verify this link — preview may not load."); }
+      } catch {
+        if (!cancelled) setResolvedUri(raw); // offline / server unreachable: still try direct
+      } finally {
+        if (!cancelled) setResolving(false);
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [imgUrl, initial?.imageUrl]);
+  const previewUri = resolvedUri;
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -383,8 +416,9 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
       title: title.trim(),
       description: desc.trim() || title.trim(),
       category: cat,
-      imageUrl: previewUri ?? PLACEHOLDER_IMGS[seed],
-      targetDate: targetDate.trim() || new Date(Date.now() + 365 * 864e5).toISOString().split('T')[0],
+      imageUrl: previewUri ?? (/^https?:\/\//i.test(imgUrl.trim()) ? imgUrl.trim() : PLACEHOLDER_IMGS[seed]),
+      // No date picked → store no date (card shows "Date Not Set")
+      targetDate: targetDate.trim(),
       progress,
     });
   };
@@ -429,7 +463,7 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
               {previewUri ? (
                 <>
                   <VisionImage uri={previewUri} style={StyleSheet.absoluteFill} />
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', padding: Spacing.md }]}>
+                  <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.85)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 64, justifyContent: 'flex-end', padding: Spacing.md }}>
                     <View style={{ alignSelf: 'flex-start', paddingHorizontal: Spacing.md, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, backgroundColor: accent + '28', borderColor: accent + '65' }}>
                       <Text style={{ fontSize: FontSize.xs, color: accent, fontWeight: '700' }}>{cat}</Text>
                     </View>
@@ -464,7 +498,9 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
                   </Pressable>
                 )}
               </View>
-              <Text style={{ fontSize: FontSize.xs, color: c.textSubtle, marginTop: -2 }}>Leave blank for a curated placeholder</Text>
+              <Text style={{ fontSize: FontSize.xs, color: linkError ? c.error : c.textSubtle, marginTop: -2 }}>
+                {resolving ? 'Checking link…' : linkError ?? 'Paste an image link from Google Images, Unsplash or Pixabay — or leave blank for a curated placeholder'}
+              </Text>
             </View>
 
             {/* Dream Title */}
@@ -690,12 +726,12 @@ function VisionDetailModal({
             </View>
 
             {/* Target date */}
-            {item.targetDate && (
+            {(
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: c.glassBg, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: c.border }}>
                 <Ionicons name="calendar-outline" size={18} color={c.textMuted} />
                 <View>
                   <Text style={{ fontSize: FontSize.xs, color: c.textSubtle }}>Target date</Text>
-                  <Text style={{ fontSize: FontSize.sm, color: c.textMuted, fontWeight: '600', marginTop: 1 }}>{item.targetDate}</Text>
+                  <Text style={{ fontSize: FontSize.sm, color: c.textMuted, fontWeight: '600', marginTop: 1 }}>{item.targetDate || 'Date Not Set'}</Text>
                 </View>
               </View>
             )}

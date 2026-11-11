@@ -104,7 +104,11 @@ const KEYS = {
   LAST_OPEN: '@hera_last_open',
   NOTIF: '@hera_notif_settings',
   LAST_SYNC: '@hera_last_sync',
+  OWNER: '@hera_owner_id',
 } as const;
+
+// Per-account data that must never carry over to a different signed-in user.
+const ACCOUNT_DATA_KEYS = [KEYS.USER, KEYS.JOURNAL, KEYS.VISION, KEYS.CHAT, KEYS.MOOD, KEYS.FAVORITES, KEYS.LAST_SYNC];
 
 const DEFAULT_MORNING: NotifSetting = { enabled: false, hour: 8, minute: 0 };
 const DEFAULT_EVENING: NotifSetting = { enabled: false, hour: 20, minute: 0 };
@@ -162,6 +166,10 @@ export function HeraProvider({ children }: { children: ReactNode }) {
   // during the restore-choice UI, cleared by triggerSync
   const syncLockRef = useRef(false);
 
+  // Resolves once the on-device cache has been restored into state.
+  const resolveInitialLoad = useRef<() => void>(() => {});
+  const initialLoadDone = useRef(new Promise<void>(r => { resolveInitialLoad.current = r; }));
+
   // Refs to read current state inside async operations without stale closures
   const journalRef = useRef(journalEntries);
   const visionRef = useRef(visionItems);
@@ -175,12 +183,32 @@ export function HeraProvider({ children }: { children: ReactNode }) {
   // ─── Auth state listener ────────────────────────────────────────────────
   useEffect(() => {
     const supabase = getSupabaseClient();
-    supabase.auth.getSession().then(({ data }) => {
-      setIsAuthenticated(!!data.session?.user);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session?.user);
-    });
+    // Before marking a session authenticated (which triggers sync), make sure the
+    // on-device cache belongs to THIS account. If another account used the device,
+    // wipe its journals/visions/chat so they are neither shown nor pushed to this account.
+    const applySession = async (session: any) => {
+      const uid: string | undefined = session?.user?.id;
+      await initialLoadDone.current; // never race the AsyncStorage restore below
+      if (uid) {
+        const owner = await AsyncStorage.getItem(KEYS.OWNER);
+        if (owner !== uid) {
+          if (owner) {
+            await AsyncStorage.multiRemove(ACCOUNT_DATA_KEYS);
+            setJournalEntries([]);
+            setVisionItems([]);
+            setChatHistory([WELCOME_MESSAGE]);
+            setFavoriteAffirmations([]);
+            setTodayMoodState(null);
+            setLastSyncedAt(null);
+            setUser(prev => ({ ...DEFAULT_USER, onboardingComplete: prev.onboardingComplete }));
+          }
+          await AsyncStorage.setItem(KEYS.OWNER, uid);
+        }
+      }
+      setIsAuthenticated(!!uid);
+    };
+    supabase.auth.getSession().then(({ data }: any) => applySession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: any, session: any) => { applySession(session); });
     return () => listener.subscription.unsubscribe();
   }, []);
 
@@ -244,6 +272,7 @@ export function HeraProvider({ children }: { children: ReactNode }) {
         // Silent — defaults remain
       } finally {
         setIsLoading(false);
+        resolveInitialLoad.current();
       }
     })();
   }, []);

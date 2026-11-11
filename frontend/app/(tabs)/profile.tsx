@@ -519,7 +519,7 @@ function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    showAlert('Sign Out', 'Your data will remain on this device. Sign out of cloud sync?', [
+    showAlert('Sign Out', 'Your data stays on this device for this account. If a different account signs in here, this device\'s local data is cleared. Sign out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: async () => { await logout(); router.replace('/login'); } },
     ]);
