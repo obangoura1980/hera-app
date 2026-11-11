@@ -98,11 +98,12 @@ const fn = StyleSheet.create({
 
 // ── Layout ────────────────────────────────────────────────────────────────────
 export default function TabLayout() {
+  const { colors } = useTheme();
   return (
     <>
       <Tabs
         tabBar={(props) => <FloatingTabBar {...props} />}
-        screenOptions={{ headerShown: false }}
+        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.background } }}
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="chat" />

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, KeyboardAvoidingView, Platform, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Platform, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,6 +65,7 @@ export default function ChatScreen() {
   const { canSendChat, isSubscribed, dailyChatCount, showPaywall, incrementChatCount } = useSubscription();
   const { showAlert } = useAlert();
   const requireOnline = useRequireOnline();
+  const keyboardVisible = useKeyboardState(state => state.isVisible);
 
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -232,7 +234,7 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
           ref={scrollRef}
           style={s.messages}
@@ -286,8 +288,9 @@ export default function ChatScreen() {
           )}
         </ScrollView>
 
-        {/* Input — sits above the floating capsule nav bar (~90pt tall) */}
-        <View style={[s.inputArea, { paddingBottom: Math.max(insets.bottom, 16) + 90 }]}>
+        {/* Input — sits above the floating capsule nav bar (~90pt tall) when the keyboard is
+            closed; when it's open the nav bar is hidden behind it, so no extra gap is needed. */}
+        <View style={[s.inputArea, { paddingBottom: keyboardVisible ? Spacing.sm : Math.max(insets.bottom, 16) + 90 }]}>
           <View style={s.inputRow}>
             <TextInput
               value={input}
