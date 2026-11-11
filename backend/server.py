@@ -12,6 +12,7 @@ from pathlib import Path
 from bson import ObjectId
 import os
 import asyncio
+import mimetypes
 import json
 import uuid
 import logging
@@ -488,15 +489,20 @@ async def delete_goal(goal_id: str, user: User = Depends(current_user)):
 # ---------------------------------------------------------------- routes: files
 @api.post("/upload")
 async def upload(file: UploadFile = File(...), user: User = Depends(current_user)):
-    if not (file.content_type or "").startswith("image/"):
-        raise HTTPException(400, "Only images are allowed")
+    ctype = (file.content_type or "").lower()
+    if not ctype.startswith("image/"):
+        # Native uploads can arrive without a type (or as octet-stream) — infer from the name.
+        guessed = mimetypes.guess_type(file.filename or "")[0] or ""
+        if ctype not in ("", "application/octet-stream") or not guessed.startswith("image/"):
+            raise HTTPException(400, "Only images are allowed")
+        ctype = guessed
     data = await file.read()
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(413, "Image too large (max 10MB)")
     ext = (file.filename or "img.jpg").rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "jpg"
     path = f"{APP_NAME}/uploads/{user.id}/{uuid.uuid4()}.{ext}"
     try:
-        result = await run_in_threadpool(put_object, path, data, file.content_type)
+        result = await run_in_threadpool(put_object, path, data, ctype)
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else 500
         if code == 402:
@@ -504,7 +510,7 @@ async def upload(file: UploadFile = File(...), user: User = Depends(current_user
         logger.exception("upload failed")
         raise HTTPException(502, "Upload failed")
     rec = FileRecord(user_id=user.id, storage_path=result["path"], original_name=file.filename or "",
-                     content_type=file.content_type, size=result.get("size", len(data)))
+                     content_type=ctype, size=result.get("size", len(data)))
     await db.files.insert_one(rec.to_mongo())
     return {"path": result["path"]}
 
