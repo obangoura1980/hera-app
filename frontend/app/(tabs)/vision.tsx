@@ -6,12 +6,12 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
 import { useRequireOnline } from '@/src/utils/useRequireOnline';
-import { useFocusEffect, router } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
 import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Spacing, Radius, FontSize } from '@/constants/theme';
@@ -722,7 +722,6 @@ function VisionDetailModal({
 
 // ── Main Screen ────────────────────────────────────────────────────────────────
 export default function VisionScreen() {
-  const insets = useSafeAreaInsets();
   const { colors: c, isDark } = useTheme();
   const { visionItems, addVisionItem, deleteVisionItem, updateUser } = useHera();
   const { showAlert } = useAlert();
@@ -766,13 +765,16 @@ export default function VisionScreen() {
 
   // Android hardware/gesture back: return to Home instead of exiting the app
   // (open modals handle back themselves via onRequestClose)
+  // Hardware/gesture back: go to the previous tab, or Home if there is none.
+  const navigation = useNavigation<any>();
   useFocusEffect(useCallback(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.navigate('/(tabs)');
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.navigate('index');
       return true;
     });
     return () => sub.remove();
-  }, []));
+  }, [navigation]));
 
   const handleEditFromDetail = useCallback((item: VisionItem) => {
     setShowDetailModal(false);
@@ -803,9 +805,10 @@ export default function VisionScreen() {
   return (
     <ReAnimated.View style={[{ flex: 1, backgroundColor: c.background }, screenAnimStyle]}>
       <LinearGradient colors={bgColors} style={StyleSheet.absoluteFill} />
+      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
 
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SIDE_PAD, paddingBottom: Spacing.md, paddingTop: insets.top + Spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SIDE_PAD, paddingBottom: Spacing.md, paddingTop: Spacing.sm }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: FontSize.xxl, color: c.textWhite, fontWeight: '700' }}>Vision Board</Text>
           <Text style={{ fontSize: FontSize.sm, color: c.textMuted, marginTop: 2 }}>Your dreams made visible</Text>
@@ -853,7 +856,7 @@ export default function VisionScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: SIDE_PAD, paddingTop: 2, paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingHorizontal: SIDE_PAD, paddingTop: 2, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
         {filtered.length === 0 ? (
@@ -926,6 +929,7 @@ export default function VisionScreen() {
         onSave={handleSaveEdit}
         mode="edit"
       />
+      </SafeAreaView>
     </ReAnimated.View>
   );
 }
