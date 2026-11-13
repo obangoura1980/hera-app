@@ -1,7 +1,8 @@
-import { Platform } from "react-native";
 import { fetch as expoFetch } from "expo/fetch";
 
 import { storage } from "@/src/utils/storage";
+import { assertOnline } from "@/src/utils/network";
+import { uploadForm } from "@/src/utils/upload";
 
 export const API = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
 const TOKEN_KEY = "hera_token";
@@ -34,6 +35,7 @@ function errorMessage(body: any, status: number) {
 }
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+  assertOnline();
   const res = await fetch(`${API}${path}`, {
     method: opts.method ?? "GET",
     headers: {
@@ -48,17 +50,9 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 }
 
 export async function uploadImage(uri: string, name: string, type: string): Promise<string> {
-  const form = new FormData();
-  if (Platform.OS === "web") {
-    const blob = await (await fetch(uri)).blob();
-    form.append("file", blob, name);
-  } else {
-    form.append("file", { uri, name, type } as any);
-  }
-  const res = await fetch(`${API}/upload`, {
-    method: "POST",
+  assertOnline();
+  const res = await uploadForm(`${API}/upload`, { uri, name, type }, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form,
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, errorMessage(body, res.status));
@@ -73,6 +67,7 @@ export function fileSource(path: string) {
 }
 
 export async function streamCoach(text: string, onDelta: (t: string) => void): Promise<void> {
+  assertOnline();
   const res = await expoFetch(`${API}/coach/stream`, {
     method: "POST",
     headers: {

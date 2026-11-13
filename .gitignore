@@ -87,3 +87,7 @@ project.tar.gz
 credentials.json
 *.key
 .credentials
+
+# Android signing keys — never commit
+*.jks
+*.keystore

@@ -114,7 +114,7 @@ export async function pushVision(items: VisionItem[]): Promise<SyncResult<null>>
       description: v.description,
       category: v.category,
       image_url: v.imageUrl,
-      target_date: v.targetDate,
+      target_date: v.targetDate || null,
       progress: v.progress,
       created_at: v.createdAt,
     }));

@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHera } from '@/hooks/useHera';
 import { generateVisualizationScript } from '@/services/heraAI';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
 import { Colors, FontSize, Spacing, Radius } from '@/constants/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -255,6 +256,7 @@ function BreathingRing() {
 export default function VisualizationScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useHera();
+  const requireOnline = useRequireOnline();
 
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>('setup');
   const [selectedDuration, setSelectedDuration] = useState(5);
@@ -279,6 +281,7 @@ export default function VisualizationScreen() {
 
   // ── Start session ────────────────────────────────────────────────────────
   const startSession = useCallback(async () => {
+    if (!requireOnline()) return;
     setTimeLeft(selectedDuration * 60);
     setCurrentSegment(0);
     segIdxRef.current = 0;
@@ -299,7 +302,7 @@ export default function VisualizationScreen() {
     } finally {
       setIsLoadingScript(false);
     }
-  }, [selectedDuration, user.name, user.goals, user.focusAreas]); // Added all dependencies used in generateVisualizationScript
+  }, [selectedDuration, user.name, user.goals, user.focusAreas, requireOnline]); // Added all dependencies used in generateVisualizationScript
 
   // ── Countdown timer ──────────────────────────────────────────────────────
   useEffect(() => {

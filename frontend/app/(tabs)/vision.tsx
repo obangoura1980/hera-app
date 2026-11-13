@@ -6,11 +6,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { Image } from 'expo-image';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
-import { useFocusEffect, router } from 'expo-router';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
+import { API } from '@/src/api';
+import { useFocusEffect, useNavigation } from 'expo-router';
 import ReAnimated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Spacing, Radius, FontSize } from '@/constants/theme';
@@ -191,12 +193,13 @@ function VisionImage({
   fallbackAccent?: string;
 }) {
   const [errored, setErrored] = useState(false);
+  const [useProxy, setUseProxy] = useState(false);
   const { colors: c } = useTheme();
 
   // Normalise the URI — strip leading/trailing whitespace
   const cleanUri = uri?.trim() ?? '';
   const isValid = cleanUri.startsWith('http://') || cleanUri.startsWith('https://');
-  useEffect(() => { setErrored(false); }, [cleanUri]);
+  useEffect(() => { setErrored(false); setUseProxy(false); }, [cleanUri]);
 
   // Never swap in a random image — show an honest "unavailable" state instead
   if (!isValid || errored) {
@@ -211,14 +214,17 @@ function VisionImage({
     );
   }
 
+  // Direct load first; if the host blocks hotlinking/CORS, retry once through our
+  // backend image proxy (fetches server-side with browser headers).
   return (
     <Image
-      // Browser-like UA: some CDNs (e.g. Pixabay) reject default native agents
-      source={{ uri: cleanUri, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36', Accept: 'image/*' } }}
+      source={useProxy
+        ? { uri: `${API}/images/proxy?url=${encodeURIComponent(cleanUri)}` }
+        : { uri: cleanUri, headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36', Accept: 'image/*' } }}
       style={style}
       contentFit="cover"
       transition={300}
-      onError={() => setErrored(true)}
+      onError={() => (useProxy ? setErrored(true) : setUseProxy(true))}
       cachePolicy="memory-disk"
     />
   );
@@ -273,12 +279,12 @@ const MasonryCard = React.memo(function MasonryCard({
         <Text style={{ fontSize: FontSize.sm, color: c.textWhite, fontWeight: '600', lineHeight: 19 }} numberOfLines={2}>{item.title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
           <Text style={{ fontSize: FontSize.xs, color: accent, fontWeight: '700' }}>{item.progress}%</Text>
-          {daysLeft !== null && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              <Ionicons name="time-outline" size={10} color={c.textSubtle} />
-              <Text style={{ fontSize: 10, color: c.textSubtle }}>{daysLeft}d</Text>
-            </View>
-          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <Ionicons name="time-outline" size={10} color={c.textSubtle} />
+            <Text style={{ fontSize: 10, color: c.textSubtle }}>
+              {!item.targetDate ? 'Date Not Set' : daysLeft !== null ? `${daysLeft}d` : item.targetDate}
+            </Text>
+          </View>
         </View>
       </View>
     </Pressable>
@@ -373,7 +379,35 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
   }, [visible, initial]);
 
   const accent = CAT_COLOR[cat] ?? c.gold;
-  const previewUri = imgUrl.trim().startsWith('http') ? imgUrl.trim() : null;
+  // Pasted links (Google Images result pages, Unsplash/Pixabay pages…) are resolved by the
+  // backend into a direct image URL before previewing/saving.
+  const [resolvedUri, setResolvedUri] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  useEffect(() => {
+    const raw = imgUrl.trim();
+    setLinkError(null);
+    if (!raw) { setResolvedUri(null); setResolving(false); return; }
+    if (!/^https?:\/\//i.test(raw)) { setResolvedUri(null); setLinkError('Link must start with http:// or https://'); return; }
+    if (raw === initial?.imageUrl) { setResolvedUri(raw); return; }
+    let cancelled = false;
+    setResolving(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`${API}/images/resolve?url=${encodeURIComponent(raw)}`);
+        const data = await r.json().catch(() => ({}));
+        if (cancelled) return;
+        if (r.ok && data.url) setResolvedUri(data.url);
+        else { setResolvedUri(raw); setLinkError(data.detail || "Couldn't verify this link — preview may not load."); }
+      } catch {
+        if (!cancelled) setResolvedUri(raw); // offline / server unreachable: still try direct
+      } finally {
+        if (!cancelled) setResolving(false);
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [imgUrl, initial?.imageUrl]);
+  const previewUri = resolvedUri;
 
   const handleSave = () => {
     if (!title.trim()) return;
@@ -382,8 +416,9 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
       title: title.trim(),
       description: desc.trim() || title.trim(),
       category: cat,
-      imageUrl: previewUri ?? PLACEHOLDER_IMGS[seed],
-      targetDate: targetDate.trim() || new Date(Date.now() + 365 * 864e5).toISOString().split('T')[0],
+      imageUrl: previewUri ?? (/^https?:\/\//i.test(imgUrl.trim()) ? imgUrl.trim() : PLACEHOLDER_IMGS[seed]),
+      // No date picked → store no date (card shows "Date Not Set")
+      targetDate: targetDate.trim(),
       progress,
     });
   };
@@ -428,7 +463,7 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
               {previewUri ? (
                 <>
                   <VisionImage uri={previewUri} style={StyleSheet.absoluteFill} />
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', padding: Spacing.md }]}>
+                  <LinearGradient pointerEvents="none" colors={['transparent', 'rgba(0,0,0,0.85)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 64, justifyContent: 'flex-end', padding: Spacing.md }}>
                     <View style={{ alignSelf: 'flex-start', paddingHorizontal: Spacing.md, paddingVertical: 4, borderRadius: Radius.full, borderWidth: 1, backgroundColor: accent + '28', borderColor: accent + '65' }}>
                       <Text style={{ fontSize: FontSize.xs, color: accent, fontWeight: '700' }}>{cat}</Text>
                     </View>
@@ -463,7 +498,9 @@ function VisionFormModal({ visible, initial, onClose, onSave, mode = 'add' }: Fo
                   </Pressable>
                 )}
               </View>
-              <Text style={{ fontSize: FontSize.xs, color: c.textSubtle, marginTop: -2 }}>Leave blank for a curated placeholder</Text>
+              <Text style={{ fontSize: FontSize.xs, color: linkError ? c.error : c.textSubtle, marginTop: -2 }}>
+                {resolving ? 'Checking link…' : linkError ?? 'Paste an image link from Google Images, Unsplash or Pixabay — or leave blank for a curated placeholder'}
+              </Text>
             </View>
 
             {/* Dream Title */}
@@ -578,6 +615,7 @@ function VisionDetailModal({
   const insets = useSafeAreaInsets();
   const { colors: c, isDark } = useTheme();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
 
   if (!item) return null;
 
@@ -594,6 +632,7 @@ function VisionDetailModal({
     : (['#FDE8EA', '#F9D5D9', '#F5C2C7'] as const);
 
   const handleDelete = () => {
+    if (!requireOnline()) return;
     showAlert('Remove Vision', `Remove "${item.title}" from your vision board?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => { onClose(); onDelete(item.id); } },
@@ -687,12 +726,12 @@ function VisionDetailModal({
             </View>
 
             {/* Target date */}
-            {item.targetDate && (
+            {(
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: c.glassBg, borderRadius: Radius.lg, padding: Spacing.md, borderWidth: 1, borderColor: c.border }}>
                 <Ionicons name="calendar-outline" size={18} color={c.textMuted} />
                 <View>
                   <Text style={{ fontSize: FontSize.xs, color: c.textSubtle }}>Target date</Text>
-                  <Text style={{ fontSize: FontSize.sm, color: c.textMuted, fontWeight: '600', marginTop: 1 }}>{item.targetDate}</Text>
+                  <Text style={{ fontSize: FontSize.sm, color: c.textMuted, fontWeight: '600', marginTop: 1 }}>{item.targetDate || 'Date Not Set'}</Text>
                 </View>
               </View>
             )}
@@ -719,10 +758,10 @@ function VisionDetailModal({
 
 // ── Main Screen ────────────────────────────────────────────────────────────────
 export default function VisionScreen() {
-  const insets = useSafeAreaInsets();
   const { colors: c, isDark } = useTheme();
   const { visionItems, addVisionItem, deleteVisionItem, updateUser } = useHera();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
 
   const screenOpacity = useSharedValue(0);
   const screenSlide   = useSharedValue(10);
@@ -751,8 +790,9 @@ export default function VisionScreen() {
   const manifested = useMemo(() => visionItems.filter(v => v.progress >= 100).length, [visionItems]);
 
   const handleDelete = useCallback((id: string) => {
+    if (!requireOnline()) return;
     deleteVisionItem(id);
-  }, [deleteVisionItem]);
+  }, [deleteVisionItem, requireOnline]);
 
   const handleCardPress = useCallback((item: VisionItem) => {
     setDetailItem(item);
@@ -761,13 +801,16 @@ export default function VisionScreen() {
 
   // Android hardware/gesture back: return to Home instead of exiting the app
   // (open modals handle back themselves via onRequestClose)
+  // Hardware/gesture back: go to the previous tab, or Home if there is none.
+  const navigation = useNavigation<any>();
   useFocusEffect(useCallback(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.navigate('/(tabs)');
+      if (navigation.canGoBack()) navigation.goBack();
+      else navigation.navigate('index');
       return true;
     });
     return () => sub.remove();
-  }, []));
+  }, [navigation]));
 
   const handleEditFromDetail = useCallback((item: VisionItem) => {
     setShowDetailModal(false);
@@ -776,18 +819,20 @@ export default function VisionScreen() {
   }, []);
 
   const handleAdd = useCallback((item: Omit<VisionItem, 'id' | 'createdAt'>) => {
+    if (!requireOnline()) return;
     addVisionItem(item);
     setShowAddModal(false);
-  }, [addVisionItem]);
+  }, [addVisionItem, requireOnline]);
 
   // Edit: delete old + re-add with same ID pattern (context doesn't expose update, so we remove+add)
   const handleSaveEdit = useCallback((updated: Omit<VisionItem, 'id' | 'createdAt'>) => {
     if (!editItem) return;
+    if (!requireOnline()) return;
     deleteVisionItem(editItem.id);
     addVisionItem(updated);
     setShowEditModal(false);
     setEditItem(null);
-  }, [editItem, deleteVisionItem, addVisionItem]);
+  }, [editItem, deleteVisionItem, addVisionItem, requireOnline]);
 
   const bgColors = isDark
     ? (['#080A18', '#0F1025', '#131838'] as const)
@@ -796,9 +841,10 @@ export default function VisionScreen() {
   return (
     <ReAnimated.View style={[{ flex: 1, backgroundColor: c.background }, screenAnimStyle]}>
       <LinearGradient colors={bgColors} style={StyleSheet.absoluteFill} />
+      <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1 }}>
 
       {/* Header */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SIDE_PAD, paddingBottom: Spacing.md, paddingTop: insets.top + Spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: SIDE_PAD, paddingBottom: Spacing.md, paddingTop: Spacing.sm }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: FontSize.xxl, color: c.textWhite, fontWeight: '700' }}>Vision Board</Text>
           <Text style={{ fontSize: FontSize.sm, color: c.textMuted, marginTop: 2 }}>Your dreams made visible</Text>
@@ -809,7 +855,7 @@ export default function VisionScreen() {
               <Text style={{ fontSize: FontSize.xs, color: c.gold, fontWeight: '600' }}>🏆 {manifested} manifested</Text>
             </View>
           )}
-          <Pressable onPress={() => setShowAddModal(true)} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden' }, pressed && { opacity: 0.82 }]}>
+          <Pressable onPress={() => { if (requireOnline()) setShowAddModal(true); }} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden' }, pressed && { opacity: 0.82 }]}>
             <LinearGradient colors={[c.primary, c.primaryDark]} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="add" size={24} color="white" />
             </LinearGradient>
@@ -846,7 +892,7 @@ export default function VisionScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: SIDE_PAD, paddingTop: 2, paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingHorizontal: SIDE_PAD, paddingTop: 2, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
       >
         {filtered.length === 0 ? (
@@ -858,7 +904,7 @@ export default function VisionScreen() {
                 ? 'Add your first dream and watch the universe conspire in your favor'
                 : `No ${filterCat} visions yet — add one to begin`}
             </Text>
-            <Pressable onPress={() => setShowAddModal(true)} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden', marginTop: Spacing.sm }, pressed && { opacity: 0.85 }]}>
+            <Pressable onPress={() => { if (requireOnline()) setShowAddModal(true); }} style={({ pressed }) => [{ borderRadius: Radius.full, overflow: 'hidden', marginTop: Spacing.sm }, pressed && { opacity: 0.85 }]}>
               <LinearGradient colors={[c.primary, c.primaryDark]} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md }}>
                 <Ionicons name="add-circle" size={18} color="white" />
                 <Text style={{ fontSize: FontSize.base, color: 'white', fontWeight: '700' }}>Add Vision</Text>
@@ -919,6 +965,7 @@ export default function VisionScreen() {
         onSave={handleSaveEdit}
         mode="edit"
       />
+      </SafeAreaView>
     </ReAnimated.View>
   );
 }

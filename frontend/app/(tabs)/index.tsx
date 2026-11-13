@@ -12,6 +12,7 @@ import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAuth, useAlert } from '@/template';
 import { loadAvatarUrl } from '@/services/avatarService';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
 import { Spacing, Radius, FontSize, ThemeColors } from '@/constants/theme';
 
 const TRENDING_ITEMS = [
@@ -195,10 +196,15 @@ export default function HomeScreen() {
   } = useHera();
   const { user: authUser } = useAuth();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
 
   // Toast animation shared values
   const toastX = useSharedValue(200);
   const toastOpacity = useSharedValue(0);
+  const [manifestInput, setManifestInput] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMsg, setToastMsg] = useState('Daily Affirmation Saved');
 
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -226,16 +232,11 @@ export default function HomeScreen() {
       );
       return;
     }
+    if (!requireOnline()) return;
     const willSave = !favoriteAffirmations.includes(aff);
     toggleFavoriteAffirmation(aff);
     if (willSave) showToast('Daily Affirmation Saved');
-  }, [isAuthenticated, favoriteAffirmations, toggleFavoriteAffirmation, showAlert, router, showToast]);
-
-  const [manifestInput, setManifestInput] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMsg, setToastMsg] = useState('Daily Affirmation Saved');
-
+  }, [isAuthenticated, favoriteAffirmations, toggleFavoriteAffirmation, showAlert, router, showToast, requireOnline]);
 
   const toastAnimStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: toastX.value }],
@@ -291,6 +292,7 @@ export default function HomeScreen() {
 
   const handleSubmit = () => {
     if (!manifestInput.trim()) return;
+    if (!requireOnline()) return;
     router.push({
       pathname: '/(tabs)/chat',
       params: { initialMessage: manifestInput.trim(), msgTimestamp: Date.now().toString() },

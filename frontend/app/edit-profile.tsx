@@ -12,6 +12,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { useAlert } from '@/template';
+import { useRequireOnline } from '@/src/utils/useRequireOnline';
 import { Spacing, Radius, FontSize } from '@/constants/theme';
 import type { ThemeColors } from '@/constants/theme';
 
@@ -54,6 +55,7 @@ export default function EditProfileScreen() {
   const { colors: c } = useTheme();
   const { user, updateUser } = useHera();
   const { showAlert } = useAlert();
+  const requireOnline = useRequireOnline();
   const s = makeStyles(c);
 
   const [name, setName] = useState(user.name ?? '');
@@ -64,6 +66,7 @@ export default function EditProfileScreen() {
 
   const save = () => {
     if (!name.trim()) { showAlert('Name Required', 'Please enter your name.'); return; }
+    if (!requireOnline()) return;
     const goalsArr = goals.split('\n').map(g => g.trim()).filter(Boolean);
     updateUser({ name: name.trim(), goals: goalsArr, profile });
     showAlert('Profile Updated', 'Your details have been saved.', [{ text: 'OK', onPress: () => router.back() }]);

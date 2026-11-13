@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, ThemeProvider as NavThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, ActivityIndicator, LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -49,8 +49,12 @@ function AppContent() {
       </View>
     );
   }
+  // Navigation theme background = app background, so nothing white ever shows
+  // behind screens while they fade/slide in.
+  const baseNavTheme = isDark ? DarkTheme : DefaultTheme;
+  const navTheme = { ...baseNavTheme, colors: { ...baseNavTheme.colors, background: colors.background, card: colors.background } };
   return (
-    <>
+    <NavThemeProvider value={navTheme}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="index" />
@@ -65,7 +69,7 @@ function AppContent() {
         <Stack.Screen name="terms" options={{ animation: 'slide_from_right' }} />
       </Stack>
       <OfflineNotice />
-    </>
+    </NavThemeProvider>
   );
 }
 

@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only retest of the iteration 32 fixes on the web preview (390x844, public URL; demo@heraapp.com logged in with its password). ALL REQUESTED ITEMS PASS. (a) ONBOARDING MUSIC RECOVERY: the SoundHelix mp3 was blocked with page.route. The splash tap created a player that failed (HTMLMediaElement error code 4), and expo-audio set playing=false. A speaker tap while the file was still blocked made another attempt, which also failed and the label stayed 'Mute music'. After the block was removed, a speaker tap on Q1 (and, in a separate run, on the Welcome screen) removed the failed player and created a new one. Only one element was playing, at volume 0.3, and currentTime kept advancing. Mute/unmute still works: volume goes 0.3 -> 0 -> 0.3 and the label switches between 'Mute music' and 'Unmute music'. Music keeps playing through Welcome -> Referral skip -> Q1 -> Q2 -> Q3 -> Back to Q2 (t 4.3 -> 13.4s). The muted state is kept across steps. (b) OFFLINE GUARDS (context.set_offline(True), navigator.onLine=false): the 'No Internet Connection / An internet connection is required...' alert appears BEFORE anything else in all of these cases. Vision detail trash: no 'Remove Vision' confirm, the detail stays open, still 4 visions. Chat refresh/Clear Conversation: no 'Start a fresh conversation' confirm. Profile Cloud Sync refresh: blocked, status unchanged. Edit Profile Save Changes: blocked, stays on /edit-profile, input kept, profile not updated. Home favorite heart: blocked, icon unchanged, no 'Saved' toast. Home manifest submit button and Enter key: blocked, URL stays '/', the typed text is kept. REGRESSION offline: Journal Save Entry is blocked (modal stays open, text kept), Journal trash is blocked (no Delete confirm), Vision + is blocked (no New Vision modal), Chat send is blocked (no bubble, input kept). ONLINE again: the toast disappears. A Journal entry was saved and showed in the list (3 entries). Journal trash -> 'Delete Entry' confirm -> Delete removes the entry. Vision + opens the New Vision modal. The Vision detail trash shows the 'Remove Vision' confirm (cancelled). Profile sync runs without the alert. Chat Clear shows its confirm ('Keep' tapped). The heart toggles with the 'Daily Affirmation Saved' toast and was toggled back. Manifest submit goes to /chat and gets an AI reply. Chat send gets an AI reply. Edit Profile save ONLINE was not run on purpose, so the demo account profile was not changed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Profile Cloud Sync", "issue": "Iteration 32 item still open: syncNow sets lastSyncedAt / 'Just now' even when result.errors is not empty. Reference: /app/frontend/contexts/HeraContext.tsx:341-344", "affected_testIDs": []}
+    ],
+    "design_issues": [
+      {"screen": "Home / Edit Profile (demo account)", "issues": ["The demo account shows 'Beautiful Soul' on Home and an empty Name field in Edit Profile, but the backend users doc has name 'Demo'. The name is not filled in after a password login. Edit Profile save then fails with 'Name Required' until a name is typed."]}
+    ],
+    "react_native_issues": [
+      {"component": "Onboarding toggleMute (native only)", "issue": "The recovery check uses getStatusAsync().isPlaying, which maps to player.playing. On native, playing is false while a remote stream is still buffering. A tap on 'Mute' in the first seconds (slow network) then stops and recreates the player instead of muting it, and repeated taps keep restarting the download. Suggest recreating only on a real error or when not loaded (e.g. track an error flag through a playbackStatusUpdate listener, or check isLoaded/isBuffering). Reference: /app/frontend/app/onboarding.tsx:734-735, /app/frontend/src/utils/av-shim.ts:22-24"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_33.json"],
+  "action_items": [
+    "LOW: onboarding.tsx toggleMute: do not recreate the player while it is still buffering on native. Recreate only when it has errored or is not loaded.",
+    "LOW (carried over from iteration 32): HeraContext.syncNow: do not update lastSyncedAt when result.errors.length > 0",
+    "LOW: Fill user.name from the backend user (e.g. 'Demo') after a password login, so Home and Edit Profile do not show an empty name",
+    "LOW: Add testIDs to Home heart / manifest submit, Chat clear (refresh), Profile sync refresh, Vision detail trash, and Journal + / trash. Tests currently rely on screen coordinates."
+  ],
+  "critical_code_review_comments": [
+    "useRequireOnline moved to its own file, so the import cycle with api.ts is gone; network.ts is clean. The native 2s debounce on isInternetReachable=false looks correct and is cleared on every change.",
+    "Vision detail handleDelete, chat handleClearChat, profile sync button, edit-profile save, the home favorite and handleSubmit all call requireOnline() before any confirm or navigation, as requested.",
+    "In Edit Profile the name check runs before requireOnline(), so offline users see 'Name Required' first if the name is empty. This is acceptable."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not requested)", "frontend": "100% of requested checks (25/25)"},
+  "seed_data_creation": "None in the DB. The TEST_ journal entry, TEST_ chat messages and the heart toggle lived only in the ephemeral browser context's local storage (demo journal/chat is local, Supabase sync is not configured). The heart was toggled back. One Journal 'Delete' online check removed the local default sample 'Morning Gratitude' in a throwaway browser context only; no DB data was changed (users/journal/favorites/coach_messages checked).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Each browser_automation call is a fresh context; the demo journal (j1 'Morning Gratitude', j2 'Weekly Reflection') is local default data. Coordinates at 390x844: Home heart (301,35), Home chat/clock (347,35), manifest submit (336,433), Chat clear/refresh (355,30), Vision + (344,33), Vision detail trash (346,28) and back (43,28), Profile sync refresh (325,585), Journal + (345,33), first trash (341,237), Edit Profile back (41,34). Speaker: [aria-label='Mute music'|'Unmute music']. Onboarding: splash tap (195,500) -> 'Continue' -> 'Skip — I don't have a code' -> Q screens use 'Continue'. Block music with page.route('**/*SoundHelix*', abort)."
+}
