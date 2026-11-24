@@ -95,6 +95,12 @@ android {
         versionCode 15
         versionName "1.0.11"
 
+        // Meta's client token is intentionally injected by the build environment
+        // instead of being committed to source control.
+        resValue "string", "facebook_app_id", System.getenv("META_ANDROID_APP_ID") ?: "2646377025800703"
+        resValue "string", "facebook_client_token", System.getenv("META_ANDROID_CLIENT_TOKEN") ?: ""
+        resValue "string", "fb_login_protocol_scheme", "fb${System.getenv('META_ANDROID_APP_ID') ?: '2646377025800703'}"
+
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
     signingConfigs {

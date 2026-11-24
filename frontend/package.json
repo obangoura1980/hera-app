@@ -48,6 +48,7 @@
     "react-native": "0.86.3",
     "react-native-appsflyer": "6.18.0",
     "react-native-dotenv": "3.4.11",
+    "react-native-fbsdk-next": "13.4.3",
     "react-native-gesture-handler": "2.32.0",
     "react-native-keyboard-controller": "1.21.9",
     "react-native-purchases": "11.0.1",

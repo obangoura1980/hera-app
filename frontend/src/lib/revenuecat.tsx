@@ -8,6 +8,7 @@ import { Platform } from "react-native";
 import Purchases, { LOG_LEVEL } from "react-native-purchases";
 import type { CustomerInfo, PurchasesPackage } from "react-native-purchases";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { syncMetaAttributionToRevenueCat } from "@/src/services/metaAttributionService";
 
 const REVENUECAT_TEST_API_KEY =
   process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY || "test_DVTXvbpqNHTxfpwfxYwOVtIgyNc";
@@ -92,6 +93,7 @@ export async function rcLogIn(userId: string) {
   const res = await Purchases.logIn(userId);
   currentAppUserId = userId;
   notifyIdentity();
+  await syncMetaAttributionToRevenueCat();
   return res;
 }
 export async function rcLogOut() {
@@ -165,6 +167,8 @@ function useSubscriptionContext() {
       await ensureRevenueCat();
       // Choke point: never let an anonymous purchase through.
       if (!currentAppUserId) throw new Error("identity_not_ready");
+      // Flush Meta identifiers before RevenueCat emits the purchase event.
+      await syncMetaAttributionToRevenueCat(true);
       const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
       return customerInfo;
     },

@@ -11,6 +11,7 @@ import { useHera } from '@/hooks/useHera';
 import { useTheme } from '@/hooks/useTheme';
 import { initNotifications } from '@/services/notificationService';
 import { initAppsFlyer } from '@/src/services/appsflyerService';
+import { initMetaAttribution } from '@/src/services/metaAttributionService';
 import { useFonts } from 'expo-font';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { OfflineNotice } from '@/components/OfflineNotice';
@@ -39,6 +40,11 @@ function AppContent() {
     // AppsFlyer — init once at app launch (native only; no-op on web)
     initAppsFlyer().catch((error) => {
       if (__DEV__) console.warn('AppsFlyer initialization failed', error);
+    });
+    // Meta supplies app activation + attribution identifiers. RevenueCat remains
+    // the only sender for subscription purchase and revenue lifecycle events.
+    initMetaAttribution().catch((error) => {
+      if (__DEV__) console.warn('Meta attribution initialization failed', error);
     });
   }, []);
 
