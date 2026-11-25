@@ -25,6 +25,27 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Meta and RevenueCat attribution
+
+Hera initializes the Meta SDK for install and activation attribution, then sends
+the Facebook anonymous ID and platform advertising identifiers to RevenueCat.
+RevenueCat is the only sender for subscription purchase and revenue events, which
+prevents duplicate Meta purchase reporting.
+
+Before producing a native build, configure these protected build-environment
+variables using `.env.example` as the template:
+
+- `META_ANDROID_APP_ID`
+- `META_ANDROID_CLIENT_TOKEN`
+- `META_IOS_APP_ID`
+- `META_IOS_CLIENT_TOKEN`
+
+Meta Conversions API access tokens belong only in the RevenueCat dashboard. Never
+add a Conversions API access token to this repository or the mobile application.
+
+This integration contains native modules and must be tested with a development,
+TestFlight, or Play Store build; it is not available in Expo Go.
+
 ## Get a fresh project
 
 When you're ready, run:
