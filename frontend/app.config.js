@@ -1,9 +1,8 @@
 const { expo: baseConfig } = require('./app.json');
 
 const androidAppID = process.env.META_ANDROID_APP_ID || '2646377025800703';
-// The client supplied this as the Hera Apple app. Keep it overridable until
-// the duplicate Hera_Apple ID in Meta is confirmed.
-const iosAppID = process.env.META_IOS_APP_ID || '1749331766301889';
+// Hera's Android and iOS configurations now share one Meta app.
+const iosAppID = process.env.META_IOS_APP_ID || '2646377025800703';
 const androidClientToken = process.env.META_ANDROID_CLIENT_TOKEN || '';
 const iosClientToken = process.env.META_IOS_CLIENT_TOKEN || '';
 
